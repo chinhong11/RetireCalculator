@@ -855,6 +855,286 @@ function StocksTab() {
   );
 }
 
+// ─── Crypto Portfolio Tab ─────────────────────────────────────────────
+
+const COIN_IDS = {
+  BTC: "bitcoin", ETH: "ethereum", SOL: "solana", BNB: "binancecoin",
+  XRP: "ripple", ADA: "cardano", AVAX: "avalanche-2", DOGE: "dogecoin",
+  MATIC: "matic-network", POL: "matic-network", DOT: "polkadot",
+  SHIB: "shiba-inu", LTC: "litecoin", LINK: "chainlink", UNI: "uniswap",
+  ATOM: "cosmos", XLM: "stellar", ALGO: "algorand", VET: "vechain",
+  FIL: "filecoin", NEAR: "near", APT: "aptos", ARB: "arbitrum",
+  OP: "optimism", SUI: "sui", INJ: "injective-protocol", TRX: "tron",
+  TON: "the-open-network", PEPE: "pepe", WIF: "dogwifcoin", BONK: "bonk",
+  USDT: "tether", USDC: "usd-coin", DAI: "dai",
+  HBAR: "hedera-hashgraph", ICP: "internet-computer", IMX: "immutable-x",
+  SAND: "the-sandbox", MANA: "decentraland", AXS: "axie-infinity",
+};
+
+function fmtCoin(n) {
+  if (n == null) return "—";
+  if (n >= 1000) return "$" + n.toLocaleString("en-US", { maximumFractionDigits: 2 });
+  if (n >= 1)    return "$" + n.toFixed(2);
+  if (n >= 0.01) return "$" + n.toFixed(4);
+  if (n >= 0.000001) return "$" + n.toFixed(6);
+  return "$" + n.toPrecision(4);
+}
+
+function CryptoTab() {
+  const [holdings, setHoldings] = useState(() => {
+    try {
+      const s = localStorage.getItem("crypto_v1");
+      if (s) { const h = JSON.parse(s); if (Array.isArray(h)) return h; }
+    } catch {}
+    return [];
+  });
+
+  const [prices, setPrices] = useState({});
+  const [fetching, setFetching] = useState(new Set());
+  const [fetchErrors, setFetchErrors] = useState({});
+  const [form, setForm] = useState({ ticker: "", amount: "", buyPrice: "", fees: "0", buyDate: "", notes: "" });
+  const [refreshedAt, setRefreshedAt] = useState(null);
+
+  useEffect(() => {
+    try { localStorage.setItem("crypto_v1", JSON.stringify(holdings)); } catch {}
+  }, [holdings]);
+
+  const fetchPrice = async (ticker) => {
+    const coinId = COIN_IDS[ticker.toUpperCase()] || ticker.toLowerCase();
+    setFetching(s => new Set([...s, ticker]));
+    setFetchErrors(e => { const n = { ...e }; delete n[ticker]; return n; });
+    try {
+      const res = await fetch(
+        `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(coinId)}&vs_currencies=usd&include_24hr_change=true`
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      if (!data[coinId]?.usd) throw new Error(`"${ticker}" not found — try the CoinGecko coin ID`);
+      setPrices(p => ({
+        ...p,
+        [ticker]: { price: data[coinId].usd, change24h: data[coinId].usd_24h_change, at: Date.now() },
+      }));
+    } catch (err) {
+      setFetchErrors(e => ({ ...e, [ticker]: err.message || "Failed" }));
+    }
+    setFetching(s => { const n = new Set(s); n.delete(ticker); return n; });
+  };
+
+  const refreshAll = () => {
+    const tickers = [...new Set(holdings.map(h => h.ticker))];
+    tickers.forEach(fetchPrice);
+    setRefreshedAt(Date.now());
+  };
+
+  const addHolding = () => {
+    const ticker = form.ticker.toUpperCase().trim();
+    if (!ticker || !form.amount || !form.buyPrice) return;
+    setHoldings(hs => [...hs, {
+      id: uid(), ticker,
+      amount: parseFloat(form.amount) || 0,
+      buyPrice: parseFloat(form.buyPrice) || 0,
+      totalFees: parseFloat(form.fees) || 0,
+      buyDate: form.buyDate, notes: form.notes.trim(),
+    }]);
+    setForm({ ticker: "", amount: "", buyPrice: "", fees: "0", buyDate: "", notes: "" });
+  };
+
+  const delHolding = (id) => setHoldings(hs => hs.filter(h => h.id !== id));
+
+  const enriched = useMemo(() => holdings.map(h => {
+    const cost = h.amount * h.buyPrice + (h.totalFees || 0);
+    const p = prices[h.ticker];
+    const value = p ? h.amount * p.price : null;
+    const pnl = value !== null ? value - cost : null;
+    const pnlPct = cost > 0 && pnl !== null ? (pnl / cost) * 100 : null;
+    return { ...h, cost, value, pnl, pnlPct, pd: p || null };
+  }), [holdings, prices]);
+
+  const totalCost = enriched.reduce((s, h) => s + h.cost, 0);
+  const priced = enriched.filter(h => h.value !== null);
+  const totalValue = priced.reduce((s, h) => s + h.value, 0);
+  const totalPnl = priced.reduce((s, h) => s + h.pnl, 0);
+  const totalPnlPct = totalCost > 0 && priced.length ? (totalPnl / totalCost) * 100 : null;
+  const anyFetching = fetching.size > 0;
+
+  const GOLD = "#fbbf24";
+  const addBtnStyle = { padding: "8px 18px", borderRadius: 8, background: "rgba(251,191,36,0.12)", color: GOLD, border: "1px solid rgba(251,191,36,0.25)", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", whiteSpace: "nowrap" };
+  const thS = (align) => ({ padding: "12px 14px", textAlign: align, fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" });
+  const cols = [
+    ["Coin", "left"], ["Amount", "right"], ["Buy Price", "right"], ["Fees", "right"],
+    ["Total Cost", "right"], ["Current Price", "right"], ["Value", "right"],
+    ["P&L (USD)", "right"], ["P&L %", "right"], ["", "right"],
+  ];
+
+  return (
+    <div>
+      {/* Summary */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
+        <StatCard label="Total Invested" value={USD(totalCost)} sub="Cost basis incl. fees" color="#e8eaf0" />
+        <StatCard
+          label="Portfolio Value"
+          value={priced.length ? USD(totalValue) : "—"}
+          sub={priced.length < enriched.length && enriched.length > 0 ? `${priced.length}/${enriched.length} positions priced` : "Live prices"}
+          color={GOLD}
+        />
+        <StatCard
+          label="Total P&L"
+          value={priced.length ? USD(totalPnl) : "—"}
+          sub={totalPnlPct !== null ? `${totalPnl >= 0 ? "+" : ""}${totalPnlPct.toFixed(2)}% overall` : "Refresh to see"}
+          color={totalPnl >= 0 ? "#4ade80" : "#f87171"}
+        />
+      </div>
+
+      {/* Add Holding */}
+      <div style={{ background: "var(--card-bg)", borderRadius: 16, padding: 24, border: "1px solid var(--border)", marginBottom: 20 }}>
+        <div className="section-title">Add Holding</div>
+        <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12 }}>
+          Use common ticker symbols (BTC, ETH, SOL…) or paste the CoinGecko coin ID for any unlisted token.
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end" }}>
+          <div style={{ flex: "0 0 90px" }}>
+            <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Coin</label>
+            <input className="hl-in" style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, textTransform: "uppercase" }}
+              placeholder="BTC" value={form.ticker}
+              onChange={e => setForm(f => ({ ...f, ticker: e.target.value }))}
+              onKeyDown={e => e.key === "Enter" && addHolding()} />
+          </div>
+          <div style={{ flex: "1 1 110px" }}>
+            <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Amount</label>
+            <input className="hl-in" type="number" placeholder="0.5" value={form.amount}
+              onChange={e => setForm(f => ({ ...f, amount: e.target.value }))} min={0} step="any"
+              style={{ fontFamily: "'DM Mono', monospace" }} />
+          </div>
+          <div style={{ flex: "1 1 130px" }}>
+            <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Buy Price (USD/coin)</label>
+            <input className="hl-in" type="number" placeholder="45000" value={form.buyPrice}
+              onChange={e => setForm(f => ({ ...f, buyPrice: e.target.value }))} min={0} step="any"
+              style={{ fontFamily: "'DM Mono', monospace" }} />
+          </div>
+          <div style={{ flex: "1 1 90px" }}>
+            <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Fees (USD)</label>
+            <input className="hl-in" type="number" placeholder="0" value={form.fees}
+              onChange={e => setForm(f => ({ ...f, fees: e.target.value }))} min={0} step={0.01}
+              style={{ fontFamily: "'DM Mono', monospace" }} />
+          </div>
+          <div style={{ flex: "0 0 auto" }}>
+            <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Buy Date</label>
+            <input className="hl-in" type="date" style={{ width: 155 }} value={form.buyDate}
+              onChange={e => setForm(f => ({ ...f, buyDate: e.target.value }))} />
+          </div>
+          <div style={{ flex: "2 1 160px" }}>
+            <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Notes</label>
+            <input className="hl-in" placeholder="Optional" value={form.notes}
+              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+          </div>
+          <button onClick={addHolding} style={addBtnStyle}>+ Add</button>
+        </div>
+      </div>
+
+      {/* Holdings Table */}
+      {enriched.length > 0 ? (
+        <div style={{ background: "var(--card-bg)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 20, overflow: "hidden" }}>
+          <div style={{ padding: "20px 24px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+            <div className="section-title" style={{ margin: 0 }}>Holdings</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              {refreshedAt && (
+                <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                  Updated {new Date(refreshedAt).toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              )}
+              <button onClick={refreshAll} disabled={anyFetching} style={{ padding: "6px 16px", borderRadius: 8, background: anyFetching ? "transparent" : "rgba(251,191,36,0.1)", color: anyFetching ? "var(--muted)" : GOLD, border: `1px solid rgba(251,191,36,0.2)`, cursor: anyFetching ? "not-allowed" : "pointer", fontWeight: 600, fontSize: 12, fontFamily: "inherit" }}>
+                {anyFetching ? "⟳ Fetching…" : "⟳ Refresh Prices"}
+              </button>
+            </div>
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                  {cols.map(([label, align]) => <th key={label} style={thS(align)}>{label}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {enriched.map((h, i) => {
+                  const isLoading = fetching.has(h.ticker);
+                  const err = fetchErrors[h.ticker];
+                  return (
+                    <tr key={h.id} style={{ borderBottom: "1px solid var(--border)", background: i % 2 ? "rgba(255,255,255,0.01)" : "transparent" }}>
+                      <td style={{ padding: "12px 14px" }}>
+                        <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, color: GOLD, fontSize: 14 }}>{h.ticker}</div>
+                        {h.buyDate && <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 2 }}>{h.buyDate}</div>}
+                        {h.notes && <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 1, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.notes}</div>}
+                      </td>
+                      <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace" }}>{h.amount}</td>
+                      <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace" }}>{fmtCoin(h.buyPrice)}</td>
+                      <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: "var(--muted)" }}>{USD(h.totalFees)}</td>
+                      <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace" }}>{USD(h.cost)}</td>
+                      <td style={{ padding: "12px 14px", textAlign: "right" }}>
+                        {isLoading ? (
+                          <span style={{ color: "var(--muted)", fontSize: 12 }}>Loading…</span>
+                        ) : err ? (
+                          <button onClick={() => fetchPrice(h.ticker)} style={{ color: "#f87171", background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: 0 }} title={err}>⚠ Retry</button>
+                        ) : h.pd ? (
+                          <div>
+                            <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>{fmtCoin(h.pd.price)}</div>
+                            {h.pd.change24h != null && (
+                              <div style={{ fontSize: 11, color: h.pd.change24h >= 0 ? "#4ade80" : "#f87171" }}>
+                                {h.pd.change24h >= 0 ? "▲" : "▼"} {Math.abs(h.pd.change24h).toFixed(2)}% 24h
+                              </div>
+                            )}
+                          </div>
+                        ) : (
+                          <button onClick={() => fetchPrice(h.ticker)} style={{ padding: "4px 10px", borderRadius: 6, background: "rgba(251,191,36,0.1)", color: GOLD, border: "1px solid rgba(251,191,36,0.2)", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Fetch</button>
+                        )}
+                      </td>
+                      <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace" }}>{h.value !== null ? USD(h.value) : "—"}</td>
+                      <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>
+                        {h.pnl !== null ? <span style={{ color: h.pnl >= 0 ? "#4ade80" : "#f87171" }}>{h.pnl >= 0 ? "+" : ""}{USD(h.pnl)}</span> : "—"}
+                      </td>
+                      <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>
+                        {h.pnlPct !== null ? <span style={{ color: h.pnlPct >= 0 ? "#4ade80" : "#f87171" }}>{h.pnlPct >= 0 ? "+" : ""}{h.pnlPct.toFixed(2)}%</span> : "—"}
+                      </td>
+                      <td style={{ padding: "12px 14px" }}>
+                        <button onClick={() => delHolding(h.id)} style={{ color: "#f87171", background: "none", border: "none", cursor: "pointer", fontSize: 14, padding: "2px 8px" }}>✕</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              {enriched.length > 1 && (
+                <tfoot>
+                  <tr style={{ borderTop: "2px solid var(--border)" }}>
+                    <td style={{ padding: "12px 14px", fontWeight: 700, color: "var(--label)", fontSize: 12 }}>TOTAL</td>
+                    <td colSpan={3} />
+                    <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>{USD(totalCost)}</td>
+                    <td />
+                    <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>{priced.length ? USD(totalValue) : "—"}</td>
+                    <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 800 }}>
+                      {priced.length ? <span style={{ color: totalPnl >= 0 ? "#4ade80" : "#f87171" }}>{totalPnl >= 0 ? "+" : ""}{USD(totalPnl)}</span> : "—"}
+                    </td>
+                    <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 800 }}>
+                      {totalPnlPct !== null ? <span style={{ color: totalPnlPct >= 0 ? "#4ade80" : "#f87171" }}>{totalPnlPct >= 0 ? "+" : ""}{totalPnlPct.toFixed(2)}%</span> : "—"}
+                    </td>
+                    <td />
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div style={{ textAlign: "center", padding: "48px 24px", color: "var(--muted)", fontSize: 14, background: "var(--card-bg)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 20 }}>
+          No holdings yet. Add your first crypto position above.
+        </div>
+      )}
+
+      <div style={{ padding: "14px 18px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7 }}>
+        <strong style={{ color: "var(--label)" }}>Note:</strong> Prices are fetched from CoinGecko (free public API). P&L is unrealised gain/loss based on your cost basis (amount × buy price + fees). All values in USD. For unlisted tokens, enter the CoinGecko coin ID (e.g. "wrapped-bitcoin") in the Coin field. For personal record-keeping only — not financial advice.
+      </div>
+    </div>
+  );
+}
+
 // ─── Main App ─────────────────────────────────────────────────────────
 
 export default function CPFCalculator() {
@@ -1029,6 +1309,9 @@ export default function CPFCalculator() {
           <button className={`tab-btn ${activeTab === "stocks" ? "active" : ""}`} onClick={() => setActiveTab("stocks")}>
             📊 US Stocks
           </button>
+          <button className={`tab-btn ${activeTab === "crypto" ? "active" : ""}`} onClick={() => setActiveTab("crypto")}>
+            🪙 Crypto
+          </button>
         </div>
 
         {/* Projection Chart */}
@@ -1140,6 +1423,13 @@ export default function CPFCalculator() {
         {activeTab === "stocks" && (
           <div style={{ marginBottom: 28 }}>
             <StocksTab />
+          </div>
+        )}
+
+        {/* Crypto Tab */}
+        {activeTab === "crypto" && (
+          <div style={{ marginBottom: 28 }}>
+            <CryptoTab />
           </div>
         )}
 
