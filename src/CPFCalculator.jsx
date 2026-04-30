@@ -1415,7 +1415,7 @@ function MYStocksTab() {
 
 // ─── Summary Tab ──────────────────────────────────────────────────────
 
-function SummaryTab({ cpfData, yearsToProject }) {
+function SummaryTab({ cpfData, yearsToProject, projectionData }) {
   const properties = useMemo(() => {
     try { const s = localStorage.getItem("hl_props_v1"); return s ? JSON.parse(s) : []; } catch { return []; }
   }, []);
@@ -1457,6 +1457,46 @@ function SummaryTab({ cpfData, yearsToProject }) {
   const stocksCost = stockHoldings.reduce((s, h) => s + h.shares * h.avgCost + (h.totalFees || 0), 0);
   const cryptoCost = cryptoHoldings.reduce((s, h) => s + h.amount * h.buyPrice + (h.totalFees || 0), 0);
   const totalUSD = stocksCost + cryptoCost;
+
+  // Goals
+  const [goals, setGoals] = useState(() => {
+    try { const s = localStorage.getItem("goals_v1"); return s ? JSON.parse(s) : []; } catch { return []; }
+  });
+  const [goalForm, setGoalForm] = useState({ name: "", currency: "SGD", target: "", targetAge: "", notes: "" });
+
+  useEffect(() => {
+    try { localStorage.setItem("goals_v1", JSON.stringify(goals)); } catch {}
+  }, [goals]);
+
+  const addGoal = () => {
+    if (!goalForm.name.trim() || !goalForm.target) return;
+    setGoals(gs => [...gs, {
+      id: uid(), name: goalForm.name.trim(),
+      currency: goalForm.currency,
+      target: parseFloat(goalForm.target) || 0,
+      targetAge: parseInt(goalForm.targetAge) || null,
+      notes: goalForm.notes.trim(),
+    }]);
+    setGoalForm({ name: "", currency: "SGD", target: "", targetAge: "", notes: "" });
+  };
+
+  const delGoal = (id) => setGoals(gs => gs.filter(g => g.id !== id));
+
+  // Current asset totals per currency
+  const currentByCurrency = { SGD: cpfTotal, MYR: totalEquity + myStocksCost, USD: stocksCost + cryptoCost };
+  const fmtByCurrency = { SGD, MYR: RM, USD };
+  const labelByCurrency = {
+    SGD: "CPF projected balance",
+    MYR: "Property equity + MY Stocks",
+    USD: "US Stocks + Crypto (cost basis)",
+  };
+
+  // For SGD goals: find the age at which CPF projection first hits the target
+  const cpfAgeForTarget = (target) => {
+    if (!projectionData) return null;
+    const hit = projectionData.find(d => d.total >= target);
+    return hit ? hit.age : null;
+  };
 
   const MiniBar = ({ pct, color }) => (
     <div style={{ background: "var(--track)", borderRadius: 6, height: 6, overflow: "hidden" }}>
@@ -1622,6 +1662,137 @@ function SummaryTab({ cpfData, yearsToProject }) {
         {stockHoldings.length === 0 && cryptoHoldings.length === 0 && (
           <div style={{ textAlign: "center", color: "var(--muted)", fontSize: 13, marginTop: 12 }}>
             No holdings yet. Add positions in the <strong style={{ color: "var(--label)" }}>US Stocks</strong> or <strong style={{ color: "var(--label)" }}>Crypto</strong> tabs.
+          </div>
+        )}
+      </div>
+
+      {/* ── Retirement Goals ─────────────────────────────────────────── */}
+      <div style={{ background: "var(--card-bg)", borderRadius: 16, padding: 24, border: "1px solid var(--border)", marginBottom: 16 }}>
+        <SectionHeader title="🎯 Retirement Goals" sub="Track how close you are to each financial milestone" />
+
+        {/* Add Goal Form */}
+        <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 12, padding: 18, border: "1px solid var(--border)", marginBottom: 20 }}>
+          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--label)", marginBottom: 14 }}>Add a Goal</div>
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 10 }}>
+            <input
+              placeholder="Goal name (e.g. Retirement Fund)"
+              value={goalForm.name}
+              onChange={e => setGoalForm(f => ({ ...f, name: e.target.value }))}
+              style={{ flex: "2 1 200px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 12px", color: "var(--text)", fontSize: 13 }}
+            />
+            <select
+              value={goalForm.currency}
+              onChange={e => setGoalForm(f => ({ ...f, currency: e.target.value }))}
+              style={{ flex: "0 0 90px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 10px", color: "var(--text)", fontSize: 13 }}
+            >
+              <option value="SGD">SGD</option>
+              <option value="MYR">MYR</option>
+              <option value="USD">USD</option>
+            </select>
+            <input
+              type="number"
+              placeholder="Target amount"
+              value={goalForm.target}
+              onChange={e => setGoalForm(f => ({ ...f, target: e.target.value }))}
+              style={{ flex: "1 1 150px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 12px", color: "var(--text)", fontSize: 13 }}
+            />
+            <input
+              type="number"
+              placeholder="Target age (opt)"
+              value={goalForm.targetAge}
+              onChange={e => setGoalForm(f => ({ ...f, targetAge: e.target.value }))}
+              style={{ flex: "1 1 130px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 12px", color: "var(--text)", fontSize: 13 }}
+            />
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <input
+              placeholder="Notes (optional)"
+              value={goalForm.notes}
+              onChange={e => setGoalForm(f => ({ ...f, notes: e.target.value }))}
+              style={{ flex: 1, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 12px", color: "var(--text)", fontSize: 13 }}
+            />
+            <button
+              onClick={addGoal}
+              style={{ padding: "9px 22px", background: "var(--accent)", color: "#0a0e17", borderRadius: 8, border: "none", fontWeight: 700, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap" }}
+            >
+              + Add
+            </button>
+          </div>
+        </div>
+
+        {/* Goal Cards */}
+        {goals.length === 0 ? (
+          <div style={{ textAlign: "center", color: "var(--muted)", fontSize: 13, padding: "20px 0" }}>
+            No goals yet. Add a milestone above to start tracking your progress.
+          </div>
+        ) : (
+          <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+            {goals.map(g => {
+              const current = currentByCurrency[g.currency] || 0;
+              const pct = g.target > 0 ? Math.min(100, (current / g.target) * 100) : 0;
+              const remaining = Math.max(0, g.target - current);
+              const achieved = current >= g.target;
+              const fmtFn = fmtByCurrency[g.currency] || (n => n.toLocaleString());
+              const projAge = g.currency === "SGD" ? cpfAgeForTarget(g.target) : null;
+              const barColor = achieved ? "#34d399" : pct > 60 ? "var(--accent)" : pct > 30 ? "#fbbf24" : "#f87171";
+
+              return (
+                <div key={g.id} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 12, padding: "18px 20px", border: `1px solid ${achieved ? "rgba(52,211,153,0.25)" : "var(--border)"}`, position: "relative" }}>
+                  <button
+                    onClick={() => delGoal(g.id)}
+                    title="Remove goal"
+                    style={{ position: "absolute", top: 14, right: 14, background: "none", border: "none", color: "var(--muted)", fontSize: 16, cursor: "pointer", lineHeight: 1 }}
+                  >×</button>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 10, paddingRight: 24 }}>
+                    <div>
+                      <div style={{ fontWeight: 700, fontSize: 15, color: "var(--text)" }}>{g.name}</div>
+                      {g.notes && <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 3 }}>{g.notes}</div>}
+                    </div>
+                    <div style={{ textAlign: "right" }}>
+                      <div style={{ fontSize: 13, color: "var(--muted)" }}>Target</div>
+                      <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 800, fontSize: 20, color: "var(--label)" }}>{fmtFn(g.target)}</div>
+                      <div style={{ fontSize: 11, color: "var(--muted)" }}>{g.currency}</div>
+                    </div>
+                  </div>
+
+                  <div style={{ marginBottom: 8 }}>
+                    <MiniBar pct={pct} color={barColor} />
+                  </div>
+
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 6 }}>
+                    <div>
+                      <span style={{ fontSize: 12, color: "var(--muted)" }}>Current: </span>
+                      <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "'DM Mono', monospace", color: "var(--text)" }}>{fmtFn(current)}</span>
+                      <span style={{ fontSize: 11, color: "var(--muted)", marginLeft: 4 }}>({pct.toFixed(1)}%)</span>
+                    </div>
+                    {achieved ? (
+                      <span style={{ fontSize: 12, fontWeight: 700, color: "#34d399", background: "rgba(52,211,153,0.1)", borderRadius: 6, padding: "3px 10px" }}>✓ Goal reached!</span>
+                    ) : (
+                      <div style={{ textAlign: "right" }}>
+                        <span style={{ fontSize: 12, color: "var(--muted)" }}>Still needed: </span>
+                        <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "'DM Mono', monospace", color: "#f87171" }}>{fmtFn(remaining)}</span>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* CPF projection hint */}
+                  {g.currency === "SGD" && !achieved && (
+                    <div style={{ marginTop: 10, fontSize: 12, color: "var(--muted)", borderTop: "1px solid var(--border)", paddingTop: 10 }}>
+                      {projAge
+                        ? <>📈 Based on your CPF projection, you may reach this target around <strong style={{ color: "var(--accent)" }}>age {projAge}</strong>.</>
+                        : <>📈 Target exceeds your current {yearsToProject}-year CPF projection. Consider extending the projection period.</>
+                      }
+                    </div>
+                  )}
+                  {g.targetAge && !achieved && (
+                    <div style={{ marginTop: g.currency === "SGD" ? 6 : 10, fontSize: 12, color: "var(--muted)" }}>
+                      🗓️ Your target age: <strong style={{ color: "var(--label)" }}>{g.targetAge}</strong>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
@@ -1821,7 +1992,7 @@ export default function CPFCalculator() {
         {/* Summary Tab */}
         {activeTab === "summary" && (
           <div style={{ marginBottom: 28 }}>
-            <SummaryTab cpfData={finalData} yearsToProject={yearsToProject} />
+            <SummaryTab cpfData={finalData} yearsToProject={yearsToProject} projectionData={projectionData} />
           </div>
         )}
 
