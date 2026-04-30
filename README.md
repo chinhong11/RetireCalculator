@@ -86,7 +86,7 @@ npm run build
 
 ## Disclaimers
 
-**CPF:** For estimation only. Actual contributions may vary due to Additional Wages, bonus months, the annual salary ceiling ($102,000), and rounding rules. Interest projection uses simplified annual compounding and excludes the extra 1% on the first $60K and extra 0.5% on the next $30K of combined balances. Refer to [cpf.gov.sg](https://www.cpf.gov.sg) for official figures.
+**CPF:** For estimation only. Actual contributions may vary due to Additional Wages, bonus months, and the annual salary ceiling ($102,000). Interest projection uses simplified annual compounding and includes the extra 1% on the first S$60,000 of combined balances (OA capped at S$20,000), and for age 55+ the extra 2% on the first S$30,000 and extra 1% on the next S$30,000 — extra interest is credited to SA. Monthly compounding and precise rounding per CPF Board rules are not modelled. Refer to [cpf.gov.sg](https://www.cpf.gov.sg) for official figures.
 
 **Housing Loan:** Monthly installment uses the reducing balance (monthly rest) formula. Actual figures depend on your bank's Base Rate (BR), BLR-linked packages, lock-in periods, and rounding. MRTA/MLTA premiums and legal fees are not included. Refer to your loan agreement for accurate figures.
 

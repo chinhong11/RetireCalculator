@@ -117,17 +117,32 @@ function projectYears({ salary, age, prYear, annualIncrement, yearsToProject, oa
 
   for (let y = 0; y <= yearsToProject; y++) {
     if (y > 0) {
-      // Apply interest
+      // Apply base interest
       oaBalance *= (1 + oaReturn / 100);
       saBalance *= (1 + saReturn / 100);
       maBalance *= (1 + maReturn / 100);
-      
+
+      // Extra CPF interest on combined balances (credited to SA)
+      // OA contribution capped at $20,000 towards the threshold
+      const oaCapped = Math.min(oaBalance, 20000);
+      const combined = oaCapped + saBalance + maBalance;
+      let extraInterest = 0;
+      if (currentAge >= 55) {
+        // Age 55+: extra 2% on first $30K, extra 1% on next $30K
+        extraInterest = Math.min(combined, 30000) * 0.02
+                      + Math.min(Math.max(0, combined - 30000), 30000) * 0.01;
+      } else {
+        // Under 55: extra 1% on first $60K
+        extraInterest = Math.min(combined, 60000) * 0.01;
+      }
+      saBalance += extraInterest;
+
       // Apply salary increment
       currentSalary = currentSalary * (1 + annualIncrement / 100);
       currentAge += 1;
       currentPRYear += 1;
     }
-    
+
     // Contributions for 12 months
     const monthly = computeMonthly(currentSalary, currentAge, currentPRYear);
     if (y > 0) {
@@ -1956,8 +1971,9 @@ export default function CPFCalculator() {
           <strong style={{ color: "var(--label)" }}>Disclaimer:</strong> This calculator is for estimation purposes only.
           Rates are based on CPF Board's official tables effective 1 Jan 2026.
           OW ceiling is $8,000/month. Actual contributions may vary due to Additional Wages, bonus months,
-          annual salary ceiling ($102,000), and rounding rules. Interest computation uses a simplified annual model
-          and does not include the extra 1% on first $60K or extra 0.5% on next $30K of combined balances.
+          annual salary ceiling ($102,000), and rounding rules. Interest uses simplified annual compounding and includes
+          the extra 1% on the first $60K of combined balances (OA capped at $20K), and for age 55+ the extra 2% on
+          first $30K and extra 1% on next $30K. Extra interest is credited to SA.
           Always refer to <span style={{ color: "var(--accent)" }}>cpf.gov.sg</span> for official calculations.
         </div>
       </div>
