@@ -1,4 +1,4 @@
-import { useState, useMemo, useCallback, useEffect } from "react";
+import { useState, useMemo, useCallback, useEffect, useRef } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 // ─── CPF Rate Tables (from 1 Jan 2026) ───────────────────────────────
@@ -256,7 +256,106 @@ const CustomTooltip = ({ active, payload, label }) => {
   );
 };
 
+// ─── Export / Backup helpers ──────────────────────────────────────────
+
+function downloadBlob(filename, content, type = "text/plain") {
+  const blob = new Blob([content], { type });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url; a.download = filename; a.click();
+  URL.revokeObjectURL(url);
+}
+
+function toCsv(rows) {
+  if (!rows.length) return "";
+  const headers = Object.keys(rows[0]);
+  const esc = v => { const s = String(v ?? ""); return /[,"\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  return [headers.join(","), ...rows.map(r => headers.map(h => esc(r[h])).join(","))].join("\n");
+}
+
+function printTable(title, sections) {
+  const win = window.open("", "_blank");
+  const body = sections.map(({ heading, headers, rows }) => `
+    ${heading ? `<h2>${heading}</h2>` : ""}
+    <table>
+      <thead><tr>${headers.map(h => `<th>${h}</th>`).join("")}</tr></thead>
+      <tbody>${rows.map(row => `<tr>${row.map(c => `<td>${c ?? ""}</td>`).join("")}</tr>`).join("")}</tbody>
+    </table>
+  `).join("\n");
+  win.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>
+    body{font-family:system-ui,sans-serif;padding:24px;color:#111;font-size:13px}
+    h1{font-size:20px;margin-bottom:4px}h2{font-size:15px;margin:20px 0 8px;color:#374151;border-bottom:1px solid #e5e7eb;padding-bottom:4px}
+    .meta{font-size:12px;color:#6b7280;margin-bottom:16px}
+    table{border-collapse:collapse;width:100%;margin-bottom:8px}
+    th{background:#f3f4f6;padding:7px 10px;text-align:left;border:1px solid #d1d5db;font-weight:600}
+    td{padding:6px 10px;border:1px solid #e5e7eb;white-space:nowrap}
+    .print-btn{padding:8px 16px;background:#111;color:#fff;border:none;border-radius:6px;cursor:pointer;margin-bottom:16px;font-size:13px}
+    @media print{.print-btn{display:none}}
+  </style></head><body>
+    <h1>${title}</h1>
+    <div class="meta">Generated ${new Date().toLocaleString()}</div>
+    <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
+    ${body}
+  </body></html>`);
+  win.document.close();
+}
+
+const LS_KEYS = ["cpf_oa_start","cpf_sa_start","cpf_ma_start","hl_props_v1","hl_selid_v1","stocks_v1","crypto_v1","mystocks_v1","goals_v1"];
+
+function exportBackup() {
+  const data = {};
+  LS_KEYS.forEach(k => {
+    try { const v = localStorage.getItem(k); if (v !== null) data[k] = JSON.parse(v); } catch { try { data[k] = localStorage.getItem(k); } catch {} }
+  });
+  downloadBlob(`retire-backup-${new Date().toISOString().slice(0, 10)}.json`, JSON.stringify(data, null, 2), "application/json");
+}
+
+function importBackup(file, onDone) {
+  const reader = new FileReader();
+  reader.onload = e => {
+    try {
+      const data = JSON.parse(e.target.result);
+      LS_KEYS.forEach(k => {
+        if (k in data) try { localStorage.setItem(k, JSON.stringify(data[k])); } catch {}
+      });
+      onDone(true);
+    } catch { onDone(false); }
+  };
+  reader.readAsText(file);
+}
+
 // ─── Housing Loan Tab ─────────────────────────────────────────────────
+
+function BackupBar() {
+  const [status, setStatus] = useState(null);
+  const fileRef = useRef(null);
+
+  const handleImport = e => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    importBackup(file, ok => {
+      setStatus(ok ? "ok" : "err");
+      if (ok) setTimeout(() => window.location.reload(), 900);
+    });
+    e.target.value = "";
+  };
+
+  const btnStyle = {
+    padding: "7px 14px", borderRadius: 8, border: "1px solid var(--border)",
+    background: "rgba(255,255,255,0.05)", color: "var(--label)", fontSize: 12,
+    fontWeight: 600, cursor: "pointer", fontFamily: "inherit", whiteSpace: "nowrap",
+  };
+
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+      <button style={btnStyle} onClick={exportBackup}>↓ Export Backup</button>
+      <button style={btnStyle} onClick={() => fileRef.current?.click()}>↑ Restore Backup</button>
+      <input ref={fileRef} type="file" accept=".json" style={{ display: "none" }} onChange={handleImport} />
+      {status === "ok" && <span style={{ fontSize: 12, color: "#4ade80" }}>Restored! Reloading…</span>}
+      {status === "err" && <span style={{ fontSize: 12, color: "#f87171" }}>Invalid backup file.</span>}
+    </div>
+  );
+}
 
 const RM  = (n) => "RM " + Number(n || 0).toLocaleString("en-MY", { maximumFractionDigits: 0 });
 const RM2 = (n) => "RM " + Number(n || 0).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
@@ -375,10 +474,80 @@ function HousingLoanTab() {
 
   if (!prop) return null;
 
+  const exportHousingCsv = () => {
+    const summaryRows = properties.map(p => {
+      const dp = (p.downpaymentRecords || []).reduce((s, r) => s + (r.amount || 0), 0);
+      const loan = Math.max(0, p.purchasePrice - dp);
+      const inst = calcInstallment(loan, p.interestRate || 0, p.tenure || 0);
+      return {
+        Property: p.name, Developer: p.developer, Address: p.address,
+        Type: p.type, "Purchase Price (MYR)": p.purchasePrice,
+        "Interest Rate (%)": p.interestRate, "Tenure (yrs)": p.tenure,
+        "SPA Date": p.spaDate, "VP Date": p.vpDate,
+        "Total Downpaid (MYR)": dp.toFixed(2),
+        "Loan Amount (MYR)": loan.toFixed(2),
+        "Monthly Installment (MYR)": inst.toFixed(2),
+      };
+    });
+    const dpRows = properties.flatMap(p =>
+      (p.downpaymentRecords || []).map(r => ({
+        Property: p.name, Date: r.date, "Amount (MYR)": r.amount.toFixed(2), Note: r.note,
+      }))
+    );
+    const prRows = properties.flatMap(p =>
+      (p.progressiveRecords || []).map(r => ({
+        Property: p.name, Month: r.month, "Claim Amount (MYR)": r.claimAmount.toFixed(2),
+        Stage: r.stage, Note: r.note,
+      }))
+    );
+    let csv = "=== Property Summary ===\n" + toCsv(summaryRows);
+    if (dpRows.length) csv += "\n\n=== Downpayment Records ===\n" + toCsv(dpRows);
+    if (prRows.length) csv += "\n\n=== Progressive Disbursement Records ===\n" + toCsv(prRows);
+    downloadBlob(`housing-records-${new Date().toISOString().slice(0, 10)}.csv`, csv, "text/csv");
+  };
+
+  const exportHousingPdf = () => {
+    const sections = [
+      {
+        heading: "Property Summary",
+        headers: ["Property", "Purchase Price (MYR)", "Downpaid (MYR)", "Loan (MYR)", "Rate", "Tenure", "Monthly Installment"],
+        rows: properties.map(p => {
+          const dp = (p.downpaymentRecords || []).reduce((s, r) => s + (r.amount || 0), 0);
+          const loan = Math.max(0, p.purchasePrice - dp);
+          const inst = calcInstallment(loan, p.interestRate || 0, p.tenure || 0);
+          return [p.name, RM(p.purchasePrice), RM(dp), RM(loan), `${p.interestRate}%`, `${p.tenure} yrs`, RM2(inst)];
+        }),
+      },
+    ];
+    properties.forEach(p => {
+      if ((p.downpaymentRecords || []).length) {
+        sections.push({
+          heading: `${p.name} — Downpayment Records`,
+          headers: ["Date", "Amount (MYR)", "Note"],
+          rows: p.downpaymentRecords.map(r => [r.date, RM2(r.amount), r.note]),
+        });
+      }
+      if ((p.progressiveRecords || []).length) {
+        sections.push({
+          heading: `${p.name} — Progressive Disbursement`,
+          headers: ["Month", "Claim (MYR)", "Stage", "Note"],
+          rows: p.progressiveRecords.map(r => [r.month, RM2(r.claimAmount), r.stage, r.note]),
+        });
+      }
+    });
+    printTable("Housing Records", sections);
+  };
+
   const addBtnStyle = {
     padding: "8px 18px", borderRadius: 8, background: "rgba(110,231,183,0.12)",
     color: "var(--accent)", border: "1px solid rgba(110,231,183,0.25)",
     cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", whiteSpace: "nowrap",
+  };
+
+  const exportBtnStyle = {
+    padding: "6px 12px", borderRadius: 7, border: "1px solid var(--border)",
+    background: "rgba(255,255,255,0.04)", color: "var(--label)", fontSize: 11,
+    fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
   };
 
   return (
@@ -393,6 +562,10 @@ function HousingLoanTab() {
         <button onClick={addProp} className="pr-chip" style={{ color: "var(--accent)", borderColor: "rgba(110,231,183,0.3)" }}>
           + Add Property
         </button>
+        <div style={{ marginLeft: "auto", display: "flex", gap: 8 }}>
+          <button style={exportBtnStyle} onClick={exportHousingCsv}>↓ CSV</button>
+          <button style={exportBtnStyle} onClick={exportHousingPdf}>⎙ PDF</button>
+        </div>
       </div>
 
       {/* Property Details Form */}
@@ -675,10 +848,40 @@ function StocksTab() {
   const totalPnlPct = totalCost > 0 && priced.length ? (totalPnl / totalCost) * 100 : null;
   const anyFetching = fetching.size > 0;
 
+  const exportStocksCsv = () => {
+    const rows = enriched.map(h => ({
+      Ticker: h.ticker, Shares: h.shares, "Buy Price (USD)": h.avgCost.toFixed(4),
+      "Fees (USD)": (h.totalFees || 0).toFixed(2), "Total Cost (USD)": h.cost.toFixed(2),
+      "Current Price (USD)": h.pd ? h.pd.price.toFixed(4) : "",
+      "Market Value (USD)": h.value != null ? h.value.toFixed(2) : "",
+      "P&L (USD)": h.pnl != null ? h.pnl.toFixed(2) : "",
+      "P&L (%)": h.pnlPct != null ? h.pnlPct.toFixed(2) : "",
+      "Buy Date": h.buyDate, Notes: h.notes,
+    }));
+    downloadBlob(`us-stocks-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(rows), "text/csv");
+  };
+
+  const exportStocksPdf = () => printTable("US Stock Portfolio", [{
+    headers: ["Ticker", "Shares", "Buy Price", "Fees", "Total Cost", "Current Price", "Value", "P&L (USD)", "P&L %", "Buy Date"],
+    rows: enriched.map(h => [
+      h.ticker, h.shares, USD(h.avgCost), USD(h.totalFees || 0), USD(h.cost),
+      h.pd ? USD(h.pd.price) : "—", h.value != null ? USD(h.value) : "—",
+      h.pnl != null ? (h.pnl >= 0 ? "+" : "") + USD(h.pnl) : "—",
+      h.pnlPct != null ? (h.pnlPct >= 0 ? "+" : "") + h.pnlPct.toFixed(2) + "%" : "—",
+      h.buyDate,
+    ]),
+  }]);
+
   const addBtnStyle = {
     padding: "8px 18px", borderRadius: 8, background: "rgba(110,231,183,0.12)",
     color: "var(--accent)", border: "1px solid rgba(110,231,183,0.25)",
     cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", whiteSpace: "nowrap",
+  };
+
+  const exportBtnStyle = {
+    padding: "6px 12px", borderRadius: 7, border: "1px solid var(--border)",
+    background: "rgba(255,255,255,0.04)", color: "var(--label)", fontSize: 11,
+    fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
   };
 
   const thS = (align) => ({
@@ -768,6 +971,8 @@ function StocksTab() {
               <button onClick={refreshAll} disabled={anyFetching} style={{ padding: "6px 16px", borderRadius: 8, background: anyFetching ? "transparent" : "rgba(110,231,183,0.1)", color: anyFetching ? "var(--muted)" : "var(--accent)", border: "1px solid rgba(110,231,183,0.2)", cursor: anyFetching ? "not-allowed" : "pointer", fontWeight: 600, fontSize: 12, fontFamily: "inherit" }}>
                 {anyFetching ? "⟳ Fetching…" : "⟳ Refresh Prices"}
               </button>
+              <button style={exportBtnStyle} onClick={exportStocksCsv}>↓ CSV</button>
+              <button style={exportBtnStyle} onClick={exportStocksPdf}>⎙ PDF</button>
             </div>
           </div>
           <div style={{ overflowX: "auto" }}>
@@ -971,8 +1176,34 @@ function CryptoTab() {
   const totalPnlPct = totalCost > 0 && priced.length ? (totalPnl / totalCost) * 100 : null;
   const anyFetching = fetching.size > 0;
 
+  const exportCryptoCsv = () => {
+    const rows = enriched.map(h => ({
+      Coin: h.ticker, Amount: h.amount, "Buy Price (USD)": h.buyPrice,
+      "Fees (USD)": (h.totalFees || 0).toFixed(2), "Total Cost (USD)": h.cost.toFixed(2),
+      "Current Price (USD)": h.pd ? h.pd.price : "",
+      "Market Value (USD)": h.value != null ? h.value.toFixed(2) : "",
+      "P&L (USD)": h.pnl != null ? h.pnl.toFixed(2) : "",
+      "P&L (%)": h.pnlPct != null ? h.pnlPct.toFixed(2) : "",
+      "24h Change (%)": h.pd?.change24h != null ? h.pd.change24h.toFixed(2) : "",
+      "Buy Date": h.buyDate, Notes: h.notes,
+    }));
+    downloadBlob(`crypto-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(rows), "text/csv");
+  };
+
+  const exportCryptoPdf = () => printTable("Crypto Portfolio", [{
+    headers: ["Coin", "Amount", "Buy Price", "Fees", "Total Cost", "Current Price", "Value", "P&L (USD)", "P&L %", "Buy Date"],
+    rows: enriched.map(h => [
+      h.ticker, h.amount, fmtCoin(h.buyPrice), USD(h.totalFees || 0), USD(h.cost),
+      h.pd ? fmtCoin(h.pd.price) : "—", h.value != null ? USD(h.value) : "—",
+      h.pnl != null ? (h.pnl >= 0 ? "+" : "") + USD(h.pnl) : "—",
+      h.pnlPct != null ? (h.pnlPct >= 0 ? "+" : "") + h.pnlPct.toFixed(2) + "%" : "—",
+      h.buyDate,
+    ]),
+  }]);
+
   const GOLD = "#fbbf24";
   const addBtnStyle = { padding: "8px 18px", borderRadius: 8, background: "rgba(251,191,36,0.12)", color: GOLD, border: "1px solid rgba(251,191,36,0.25)", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", whiteSpace: "nowrap" };
+  const exportBtnStyle = { padding: "6px 12px", borderRadius: 7, border: "1px solid var(--border)", background: "rgba(255,255,255,0.04)", color: "var(--label)", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" };
   const thS = (align) => ({ padding: "12px 14px", textAlign: align, fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" });
   const cols = [
     ["Coin", "left"], ["Amount", "right"], ["Buy Price", "right"], ["Fees", "right"],
@@ -1059,6 +1290,8 @@ function CryptoTab() {
               <button onClick={refreshAll} disabled={anyFetching} style={{ padding: "6px 16px", borderRadius: 8, background: anyFetching ? "transparent" : "rgba(251,191,36,0.1)", color: anyFetching ? "var(--muted)" : GOLD, border: `1px solid rgba(251,191,36,0.2)`, cursor: anyFetching ? "not-allowed" : "pointer", fontWeight: 600, fontSize: 12, fontFamily: "inherit" }}>
                 {anyFetching ? "⟳ Fetching…" : "⟳ Refresh Prices"}
               </button>
+              <button style={exportBtnStyle} onClick={exportCryptoCsv}>↓ CSV</button>
+              <button style={exportBtnStyle} onClick={exportCryptoPdf}>⎙ PDF</button>
             </div>
           </div>
           <div style={{ overflowX: "auto" }}>
@@ -1234,8 +1467,33 @@ function MYStocksTab() {
   const totalPnlPct = totalCost > 0 && priced.length ? (totalPnl / totalCost) * 100 : null;
   const anyFetching = fetching.size > 0;
 
+  const exportMyStocksCsv = () => {
+    const rows = enriched.map(h => ({
+      Code: h.code, Shares: h.shares, "Buy Price (MYR)": h.avgCost.toFixed(4),
+      "Fees (MYR)": (h.totalFees || 0).toFixed(2), "Total Cost (MYR)": h.cost.toFixed(2),
+      "Current Price (MYR)": h.pd ? h.pd.price.toFixed(4) : "",
+      "Market Value (MYR)": h.value != null ? h.value.toFixed(2) : "",
+      "P&L (MYR)": h.pnl != null ? h.pnl.toFixed(2) : "",
+      "P&L (%)": h.pnlPct != null ? h.pnlPct.toFixed(2) : "",
+      "Buy Date": h.buyDate, Notes: h.notes,
+    }));
+    downloadBlob(`bursa-stocks-${new Date().toISOString().slice(0, 10)}.csv`, toCsv(rows), "text/csv");
+  };
+
+  const exportMyStocksPdf = () => printTable("Bursa Malaysia Stock Portfolio", [{
+    headers: ["Code", "Shares", "Buy Price (MYR)", "Fees", "Total Cost", "Current Price", "Value", "P&L (MYR)", "P&L %", "Buy Date"],
+    rows: enriched.map(h => [
+      h.code, h.shares, RM2(h.avgCost), RM2(h.totalFees || 0), RM(h.cost),
+      h.pd ? RM2(h.pd.price) : "—", h.value != null ? RM(h.value) : "—",
+      h.pnl != null ? (h.pnl >= 0 ? "+" : "") + RM2(h.pnl) : "—",
+      h.pnlPct != null ? (h.pnlPct >= 0 ? "+" : "") + h.pnlPct.toFixed(2) + "%" : "—",
+      h.buyDate,
+    ]),
+  }]);
+
   const BLUE = "#38bdf8";
   const addBtnStyle = { padding: "8px 18px", borderRadius: 8, background: "rgba(56,189,248,0.12)", color: BLUE, border: "1px solid rgba(56,189,248,0.25)", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", whiteSpace: "nowrap" };
+  const exportBtnStyle = { padding: "6px 12px", borderRadius: 7, border: "1px solid var(--border)", background: "rgba(255,255,255,0.04)", color: "var(--label)", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" };
   const thS = (align) => ({ padding: "12px 14px", textAlign: align, fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" });
   const cols = [
     ["Stock", "left"], ["Shares", "right"], ["Buy Price", "right"], ["Fees", "right"],
@@ -1322,6 +1580,8 @@ function MYStocksTab() {
               <button onClick={refreshAll} disabled={anyFetching} style={{ padding: "6px 16px", borderRadius: 8, background: anyFetching ? "transparent" : "rgba(56,189,248,0.1)", color: anyFetching ? "var(--muted)" : BLUE, border: "1px solid rgba(56,189,248,0.2)", cursor: anyFetching ? "not-allowed" : "pointer", fontWeight: 600, fontSize: 12, fontFamily: "inherit" }}>
                 {anyFetching ? "⟳ Fetching…" : "⟳ Refresh Prices"}
               </button>
+              <button style={exportBtnStyle} onClick={exportMyStocksCsv}>↓ CSV</button>
+              <button style={exportBtnStyle} onClick={exportMyStocksPdf}>⎙ PDF</button>
             </div>
           </div>
           <div style={{ overflowX: "auto" }}>
@@ -1886,6 +2146,10 @@ export default function CPFCalculator() {
           <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 8, lineHeight: 1.5 }}>
             For Permanent Residents · OW ceiling $8,000 · Based on official CPF rates
           </p>
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+            <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }}>Data Backup</div>
+            <BackupBar />
+          </div>
         </div>
       </div>
 
