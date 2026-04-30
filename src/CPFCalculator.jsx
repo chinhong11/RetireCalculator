@@ -65,7 +65,6 @@ function getSPRKey(prYear) {
 
 function getContribRates(age, prYear) {
   const sprKey = getSPRKey(prYear);
-  const ageKey = getRateKey(age);
   const table = CPF_RATES[sprKey];
   // find closest key
   const keys = Object.keys(table).map(Number).sort((a, b) => a - b);
@@ -263,7 +262,7 @@ const RM  = (n) => "RM " + Number(n || 0).toLocaleString("en-MY", { maximumFract
 const RM2 = (n) => "RM " + Number(n || 0).toLocaleString("en-MY", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 
 function calcInstallment(principal, annualRatePct, tenureYears) {
-  if (!principal || !annualRatePct || !tenureYears) return 0;
+  if (!principal || !tenureYears) return 0;
   const r = annualRatePct / 100 / 12;
   const n = tenureYears * 12;
   if (r === 0) return principal / n;
