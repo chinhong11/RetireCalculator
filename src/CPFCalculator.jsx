@@ -1135,6 +1135,269 @@ function CryptoTab() {
   );
 }
 
+// ─── Malaysia Stocks Tab ──────────────────────────────────────────────
+
+function MYStocksTab() {
+  const [holdings, setHoldings] = useState(() => {
+    try {
+      const s = localStorage.getItem("mystocks_v1");
+      if (s) { const h = JSON.parse(s); if (Array.isArray(h)) return h; }
+    } catch {}
+    return [];
+  });
+
+  const [prices, setPrices] = useState({});
+  const [fetching, setFetching] = useState(new Set());
+  const [fetchErrors, setFetchErrors] = useState({});
+  const [form, setForm] = useState({ code: "", shares: "", avgCost: "", fees: "0", buyDate: "", notes: "" });
+  const [refreshedAt, setRefreshedAt] = useState(null);
+
+  useEffect(() => {
+    try { localStorage.setItem("mystocks_v1", JSON.stringify(holdings)); } catch {}
+  }, [holdings]);
+
+  const toYahooTicker = (code) => {
+    const c = code.toUpperCase().trim();
+    return c.endsWith(".KL") ? c : c + ".KL";
+  };
+
+  const fetchPrice = async (code) => {
+    const ticker = toYahooTicker(code);
+    setFetching(s => new Set([...s, code]));
+    setFetchErrors(e => { const n = { ...e }; delete n[code]; return n; });
+    try {
+      const res = await fetch(
+        `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`
+      );
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const data = await res.json();
+      const meta = data?.chart?.result?.[0]?.meta;
+      if (!meta?.regularMarketPrice) throw new Error("Price unavailable");
+      setPrices(p => ({
+        ...p,
+        [code]: { price: meta.regularMarketPrice, prevClose: meta.previousClose ?? meta.chartPreviousClose, at: Date.now() },
+      }));
+    } catch (err) {
+      setFetchErrors(e => ({ ...e, [code]: err.message || "Failed" }));
+    }
+    setFetching(s => { const n = new Set(s); n.delete(code); return n; });
+  };
+
+  const refreshAll = () => {
+    const codes = [...new Set(holdings.map(h => h.code))];
+    codes.forEach(fetchPrice);
+    setRefreshedAt(Date.now());
+  };
+
+  const addHolding = () => {
+    const code = form.code.toUpperCase().trim();
+    if (!code || !form.shares || !form.avgCost) return;
+    setHoldings(hs => [...hs, {
+      id: uid(), code,
+      shares: parseFloat(form.shares) || 0,
+      avgCost: parseFloat(form.avgCost) || 0,
+      totalFees: parseFloat(form.fees) || 0,
+      buyDate: form.buyDate, notes: form.notes.trim(),
+    }]);
+    setForm({ code: "", shares: "", avgCost: "", fees: "0", buyDate: "", notes: "" });
+  };
+
+  const delHolding = (id) => setHoldings(hs => hs.filter(h => h.id !== id));
+
+  const enriched = useMemo(() => holdings.map(h => {
+    const cost = h.shares * h.avgCost + (h.totalFees || 0);
+    const p = prices[h.code];
+    const value = p ? h.shares * p.price : null;
+    const pnl = value !== null ? value - cost : null;
+    const pnlPct = cost > 0 && pnl !== null ? (pnl / cost) * 100 : null;
+    return { ...h, cost, value, pnl, pnlPct, pd: p || null };
+  }), [holdings, prices]);
+
+  const totalCost = enriched.reduce((s, h) => s + h.cost, 0);
+  const priced = enriched.filter(h => h.value !== null);
+  const totalValue = priced.reduce((s, h) => s + h.value, 0);
+  const totalPnl = priced.reduce((s, h) => s + h.pnl, 0);
+  const totalPnlPct = totalCost > 0 && priced.length ? (totalPnl / totalCost) * 100 : null;
+  const anyFetching = fetching.size > 0;
+
+  const BLUE = "#38bdf8";
+  const addBtnStyle = { padding: "8px 18px", borderRadius: 8, background: "rgba(56,189,248,0.12)", color: BLUE, border: "1px solid rgba(56,189,248,0.25)", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", whiteSpace: "nowrap" };
+  const thS = (align) => ({ padding: "12px 14px", textAlign: align, fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" });
+  const cols = [
+    ["Stock", "left"], ["Shares", "right"], ["Buy Price", "right"], ["Fees", "right"],
+    ["Total Cost", "right"], ["Current Price", "right"], ["Value", "right"],
+    ["P&L (RM)", "right"], ["P&L %", "right"], ["", "right"],
+  ];
+
+  return (
+    <div>
+      {/* Summary */}
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
+        <StatCard label="Total Invested" value={RM(totalCost)} sub="Cost basis incl. fees" color="#e8eaf0" />
+        <StatCard
+          label="Portfolio Value"
+          value={priced.length ? RM(totalValue) : "—"}
+          sub={priced.length < enriched.length && enriched.length > 0 ? `${priced.length}/${enriched.length} positions priced` : "Live prices"}
+          color={BLUE}
+        />
+        <StatCard
+          label="Total P&L"
+          value={priced.length ? RM(totalPnl) : "—"}
+          sub={totalPnlPct !== null ? `${totalPnl >= 0 ? "+" : ""}${totalPnlPct.toFixed(2)}% overall` : "Refresh to see"}
+          color={totalPnl >= 0 ? "#4ade80" : "#f87171"}
+        />
+      </div>
+
+      {/* Add Holding */}
+      <div style={{ background: "var(--card-bg)", borderRadius: 16, padding: 24, border: "1px solid var(--border)", marginBottom: 20 }}>
+        <div className="section-title">Add Holding</div>
+        <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 12 }}>
+          Enter the Bursa Malaysia stock code (e.g. <strong style={{ color: "var(--label)" }}>1155</strong> for Maybank, <strong style={{ color: "var(--label)" }}>5347</strong> for Tenaga, <strong style={{ color: "var(--label)" }}>MAYBANK</strong>). The .KL suffix is added automatically.
+        </div>
+        <div style={{ display: "flex", flexWrap: "wrap", gap: 10, alignItems: "flex-end" }}>
+          <div style={{ flex: "0 0 110px" }}>
+            <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Stock Code</label>
+            <input className="hl-in" style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, textTransform: "uppercase" }}
+              placeholder="1155" value={form.code}
+              onChange={e => setForm(f => ({ ...f, code: e.target.value }))}
+              onKeyDown={e => e.key === "Enter" && addHolding()} />
+          </div>
+          <div style={{ flex: "1 1 90px" }}>
+            <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Shares</label>
+            <input className="hl-in" type="number" placeholder="1000" value={form.shares}
+              onChange={e => setForm(f => ({ ...f, shares: e.target.value }))} min={0} step={100}
+              style={{ fontFamily: "'DM Mono', monospace" }} />
+          </div>
+          <div style={{ flex: "1 1 120px" }}>
+            <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Buy Price (RM/share)</label>
+            <input className="hl-in" type="number" placeholder="9.50" value={form.avgCost}
+              onChange={e => setForm(f => ({ ...f, avgCost: e.target.value }))} min={0} step={0.005}
+              style={{ fontFamily: "'DM Mono', monospace" }} />
+          </div>
+          <div style={{ flex: "1 1 90px" }}>
+            <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Fees (RM)</label>
+            <input className="hl-in" type="number" placeholder="0" value={form.fees}
+              onChange={e => setForm(f => ({ ...f, fees: e.target.value }))} min={0} step={0.01}
+              style={{ fontFamily: "'DM Mono', monospace" }} />
+          </div>
+          <div style={{ flex: "0 0 auto" }}>
+            <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Buy Date</label>
+            <input className="hl-in" type="date" style={{ width: 155 }} value={form.buyDate}
+              onChange={e => setForm(f => ({ ...f, buyDate: e.target.value }))} />
+          </div>
+          <div style={{ flex: "2 1 160px" }}>
+            <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Notes</label>
+            <input className="hl-in" placeholder="Optional" value={form.notes}
+              onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+          </div>
+          <button onClick={addHolding} style={addBtnStyle}>+ Add</button>
+        </div>
+      </div>
+
+      {/* Holdings Table */}
+      {enriched.length > 0 ? (
+        <div style={{ background: "var(--card-bg)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 20, overflow: "hidden" }}>
+          <div style={{ padding: "20px 24px 12px", display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10 }}>
+            <div className="section-title" style={{ margin: 0 }}>Holdings</div>
+            <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+              {refreshedAt && (
+                <span style={{ fontSize: 11, color: "var(--muted)" }}>
+                  Updated {new Date(refreshedAt).toLocaleTimeString("en-MY", { hour: "2-digit", minute: "2-digit" })}
+                </span>
+              )}
+              <button onClick={refreshAll} disabled={anyFetching} style={{ padding: "6px 16px", borderRadius: 8, background: anyFetching ? "transparent" : "rgba(56,189,248,0.1)", color: anyFetching ? "var(--muted)" : BLUE, border: "1px solid rgba(56,189,248,0.2)", cursor: anyFetching ? "not-allowed" : "pointer", fontWeight: 600, fontSize: 12, fontFamily: "inherit" }}>
+                {anyFetching ? "⟳ Fetching…" : "⟳ Refresh Prices"}
+              </button>
+            </div>
+          </div>
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+              <thead>
+                <tr style={{ borderBottom: "1px solid var(--border)" }}>
+                  {cols.map(([label, align]) => <th key={label} style={thS(align)}>{label}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {enriched.map((h, i) => {
+                  const isLoading = fetching.has(h.code);
+                  const err = fetchErrors[h.code];
+                  return (
+                    <tr key={h.id} style={{ borderBottom: "1px solid var(--border)", background: i % 2 ? "rgba(255,255,255,0.01)" : "transparent" }}>
+                      <td style={{ padding: "12px 14px" }}>
+                        <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, color: BLUE, fontSize: 14 }}>{h.code}</div>
+                        <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 1 }}>{toYahooTicker(h.code)}</div>
+                        {h.buyDate && <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 1 }}>{h.buyDate}</div>}
+                        {h.notes && <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 1, maxWidth: 160, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{h.notes}</div>}
+                      </td>
+                      <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace" }}>{h.shares.toLocaleString()}</td>
+                      <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace" }}>{RM2(h.avgCost)}</td>
+                      <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: "var(--muted)" }}>{RM2(h.totalFees)}</td>
+                      <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace" }}>{RM(h.cost)}</td>
+                      <td style={{ padding: "12px 14px", textAlign: "right" }}>
+                        {isLoading ? (
+                          <span style={{ color: "var(--muted)", fontSize: 12 }}>Loading…</span>
+                        ) : err ? (
+                          <button onClick={() => fetchPrice(h.code)} style={{ color: "#f87171", background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: 0 }} title={err}>⚠ Retry</button>
+                        ) : h.pd ? (
+                          <div>
+                            <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>{RM2(h.pd.price)}</div>
+                            {h.pd.prevClose != null && (() => {
+                              const chg = ((h.pd.price - h.pd.prevClose) / h.pd.prevClose) * 100;
+                              return <div style={{ fontSize: 11, color: chg >= 0 ? "#4ade80" : "#f87171" }}>{chg >= 0 ? "▲" : "▼"} {Math.abs(chg).toFixed(2)}% today</div>;
+                            })()}
+                          </div>
+                        ) : (
+                          <button onClick={() => fetchPrice(h.code)} style={{ padding: "4px 10px", borderRadius: 6, background: "rgba(56,189,248,0.1)", color: BLUE, border: "1px solid rgba(56,189,248,0.2)", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Fetch</button>
+                        )}
+                      </td>
+                      <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace" }}>{h.value !== null ? RM(h.value) : "—"}</td>
+                      <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>
+                        {h.pnl !== null ? <span style={{ color: h.pnl >= 0 ? "#4ade80" : "#f87171" }}>{h.pnl >= 0 ? "+" : ""}{RM(h.pnl)}</span> : "—"}
+                      </td>
+                      <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>
+                        {h.pnlPct !== null ? <span style={{ color: h.pnlPct >= 0 ? "#4ade80" : "#f87171" }}>{h.pnlPct >= 0 ? "+" : ""}{h.pnlPct.toFixed(2)}%</span> : "—"}
+                      </td>
+                      <td style={{ padding: "12px 14px" }}>
+                        <button onClick={() => delHolding(h.id)} style={{ color: "#f87171", background: "none", border: "none", cursor: "pointer", fontSize: 14, padding: "2px 8px" }}>✕</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+              {enriched.length > 1 && (
+                <tfoot>
+                  <tr style={{ borderTop: "2px solid var(--border)" }}>
+                    <td style={{ padding: "12px 14px", fontWeight: 700, color: "var(--label)", fontSize: 12 }}>TOTAL</td>
+                    <td colSpan={3} />
+                    <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>{RM(totalCost)}</td>
+                    <td />
+                    <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>{priced.length ? RM(totalValue) : "—"}</td>
+                    <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 800 }}>
+                      {priced.length ? <span style={{ color: totalPnl >= 0 ? "#4ade80" : "#f87171" }}>{totalPnl >= 0 ? "+" : ""}{RM(totalPnl)}</span> : "—"}
+                    </td>
+                    <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 800 }}>
+                      {totalPnlPct !== null ? <span style={{ color: totalPnlPct >= 0 ? "#4ade80" : "#f87171" }}>{totalPnlPct >= 0 ? "+" : ""}{totalPnlPct.toFixed(2)}%</span> : "—"}
+                    </td>
+                    <td />
+                  </tr>
+                </tfoot>
+              )}
+            </table>
+          </div>
+        </div>
+      ) : (
+        <div style={{ textAlign: "center", padding: "48px 24px", color: "var(--muted)", fontSize: 14, background: "var(--card-bg)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 20 }}>
+          No holdings yet. Add your first Bursa Malaysia stock above.
+        </div>
+      )}
+
+      <div style={{ padding: "14px 18px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7 }}>
+        <strong style={{ color: "var(--label)" }}>Note (Bursa Malaysia):</strong> Prices are fetched from Yahoo Finance using the .KL suffix and may be delayed 15–20 minutes during Bursa trading hours (9:00am–5:00pm MYT, Mon–Fri). P&L is unrealised gain/loss based on cost basis (shares × buy price + fees). Include brokerage fees and stamp duty in the Fees field for accurate cost basis. All values in MYR. For personal record-keeping only — not financial advice.
+      </div>
+    </div>
+  );
+}
+
 // ─── Summary Tab ──────────────────────────────────────────────────────
 
 function SummaryTab({ cpfData, yearsToProject }) {
@@ -1148,6 +1411,10 @@ function SummaryTab({ cpfData, yearsToProject }) {
 
   const cryptoHoldings = useMemo(() => {
     try { const s = localStorage.getItem("crypto_v1"); return s ? JSON.parse(s) : []; } catch { return []; }
+  }, []);
+
+  const myStockHoldings = useMemo(() => {
+    try { const s = localStorage.getItem("mystocks_v1"); return s ? JSON.parse(s) : []; } catch { return []; }
   }, []);
 
   const SGD = (n) => "S$" + Number(n || 0).toLocaleString("en-SG", { maximumFractionDigits: 0 });
@@ -1167,6 +1434,9 @@ function SummaryTab({ cpfData, yearsToProject }) {
   const totalPropValue = propStats.reduce((s, p) => s + p.purchasePrice, 0);
   const totalEquity    = propStats.reduce((s, p) => s + p.downpaid, 0);
   const totalOutstanding = propStats.reduce((s, p) => s + p.outstanding, 0);
+
+  // MY Stocks (MYR)
+  const myStocksCost = myStockHoldings.reduce((s, h) => s + h.shares * h.avgCost + (h.totalFees || 0), 0);
 
   // Investments (USD)
   const stocksCost = stockHoldings.reduce((s, h) => s + h.shares * h.avgCost + (h.totalFees || 0), 0);
@@ -1197,7 +1467,7 @@ function SummaryTab({ cpfData, yearsToProject }) {
     <div>
       {/* Multi-currency notice */}
       <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(129,140,248,0.06)", border: "1px solid rgba(129,140,248,0.12)", fontSize: 12, color: "var(--label)", marginBottom: 20, lineHeight: 1.7 }}>
-        ℹ️ Your assets span multiple currencies — <strong>SGD</strong> (CPF), <strong>MYR</strong> (Property), <strong>USD</strong> (Stocks &amp; Crypto). Values are shown in their native currency without conversion. Stock and crypto figures reflect cost basis; visit those tabs and refresh prices to see live P&amp;L.
+        ℹ️ Your assets span multiple currencies — <strong>SGD</strong> (CPF), <strong>MYR</strong> (Property &amp; MY Stocks), <strong>USD</strong> (US Stocks &amp; Crypto). Values are shown in their native currency without conversion. Stock and crypto figures reflect cost basis; visit those tabs and refresh prices to see live P&amp;L.
       </div>
 
       {/* CPF (SGD) */}
@@ -1230,12 +1500,12 @@ function SummaryTab({ cpfData, yearsToProject }) {
         )}
       </div>
 
-      {/* Housing (MYR) */}
+      {/* Housing + MY Stocks (MYR) */}
       <div style={{ background: "var(--card-bg)", borderRadius: 16, padding: 24, border: "1px solid var(--border)", marginBottom: 16 }}>
         <SectionHeader
-          title="Property / Housing — MYR"
-          sub={`${properties.length} propert${properties.length === 1 ? "y" : "ies"} · downpayment paid shown as equity`}
-          value={properties.length ? RM(totalEquity) : null}
+          title="MYR Assets — Property &amp; Bursa Stocks"
+          sub={`${properties.length} propert${properties.length === 1 ? "y" : "ies"} · ${myStockHoldings.length} Bursa position${myStockHoldings.length !== 1 ? "s" : ""} · cost basis`}
+          value={(properties.length || myStockHoldings.length) ? RM(totalEquity + myStocksCost) : null}
           valueColor="var(--accent)"
         />
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: properties.length ? 16 : 0 }}>
@@ -1250,6 +1520,17 @@ function SummaryTab({ cpfData, yearsToProject }) {
             </div>
           ))}
         </div>
+        {/* MY Stocks mini-card */}
+        <div style={{ background: "rgba(56,189,248,0.06)", borderRadius: 12, padding: "14px 16px", border: "1px solid rgba(56,189,248,0.15)", marginBottom: 14 }}>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+            <span style={{ fontSize: 13, fontWeight: 600, color: "#38bdf8" }}>📈 Bursa Malaysia Stocks</span>
+            <span style={{ fontSize: 11, color: "var(--muted)" }}>{myStockHoldings.length} position{myStockHoldings.length !== 1 ? "s" : ""}</span>
+          </div>
+          <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 800, fontSize: 20, color: "#38bdf8", marginBottom: 4 }}>{RM(myStocksCost)}</div>
+          <div style={{ fontSize: 11, color: "var(--muted)" }}>Cost basis · visit MY Stocks tab for live P&amp;L</div>
+          {myStockHoldings.length === 0 && <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 4 }}>No positions yet.</div>}
+        </div>
+
         {propStats.length > 0 ? (
           <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {propStats.map(p => (
@@ -1278,7 +1559,7 @@ function SummaryTab({ cpfData, yearsToProject }) {
           </div>
         ) : (
           <div style={{ textAlign: "center", color: "var(--muted)", fontSize: 13, padding: "8px 0" }}>
-            No properties added yet. Visit the <strong style={{ color: "var(--label)" }}>Housing Loan</strong> tab to get started.
+            No properties added yet. Visit the <strong style={{ color: "var(--label)" }}>Housing Loan</strong> or <strong style={{ color: "var(--label)" }}>MY Stocks</strong> tab to get started.
           </div>
         )}
       </div>
@@ -1331,7 +1612,7 @@ function SummaryTab({ cpfData, yearsToProject }) {
       </div>
 
       <div style={{ padding: "14px 18px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7 }}>
-        <strong style={{ color: "var(--label)" }}>Note:</strong> CPF figures are projected values based on your inputs — not actual current balances. Property equity reflects total downpayments recorded, not appraised market value. Stock and crypto values show cost basis only. No currency conversion is applied between SGD, MYR, and USD.
+        <strong style={{ color: "var(--label)" }}>Note:</strong> CPF figures are projected values based on your inputs — not actual current balances. Property equity reflects total downpayments recorded, not appraised market value. Stock and crypto values show cost basis only. No currency conversion is applied between SGD, MYR, and USD. Visit each tab and refresh prices to see live portfolio values and unrealised P&amp;L.
       </div>
     </div>
   );
@@ -1511,6 +1792,9 @@ export default function CPFCalculator() {
           <button className={`tab-btn ${activeTab === "housing" ? "active" : ""}`} onClick={() => setActiveTab("housing")}>
             🏠 Housing Loan
           </button>
+          <button className={`tab-btn ${activeTab === "mystocks" ? "active" : ""}`} onClick={() => setActiveTab("mystocks")}>
+            🇲🇾 MY Stocks
+          </button>
           <button className={`tab-btn ${activeTab === "stocks" ? "active" : ""}`} onClick={() => setActiveTab("stocks")}>
             📊 US Stocks
           </button>
@@ -1628,6 +1912,13 @@ export default function CPFCalculator() {
         {activeTab === "housing" && (
           <div style={{ marginBottom: 28 }}>
             <HousingLoanTab />
+          </div>
+        )}
+
+        {/* MY Stocks Tab */}
+        {activeTab === "mystocks" && (
+          <div style={{ marginBottom: 28 }}>
+            <MYStocksTab />
           </div>
         )}
 
