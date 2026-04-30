@@ -108,9 +108,9 @@ function computeMonthly(salary, age, prYear) {
   };
 }
 
-function projectYears({ salary, age, prYear, annualIncrement, yearsToProject, oaReturn, saReturn, maReturn }) {
+function projectYears({ salary, age, prYear, annualIncrement, yearsToProject, oaReturn, saReturn, maReturn, oaStart = 0, saStart = 0, maStart = 0 }) {
   const data = [];
-  let oaBalance = 0, saBalance = 0, maBalance = 0;
+  let oaBalance = oaStart, saBalance = saStart, maBalance = maStart;
   let currentSalary = salary;
   let currentAge = age;
   let currentPRYear = prYear;
@@ -1815,12 +1815,19 @@ export default function CPFCalculator() {
   const [oaReturn, setOaReturn] = useState(2.5);
   const [saReturn, setSaReturn] = useState(4.0);
   const [maReturn, setMaReturn] = useState(4.0);
+  const [oaStart, setOaStart] = useState(() => { try { return parseFloat(localStorage.getItem("cpf_oa_start") || "0") || 0; } catch { return 0; } });
+  const [saStart, setSaStart] = useState(() => { try { return parseFloat(localStorage.getItem("cpf_sa_start") || "0") || 0; } catch { return 0; } });
+  const [maStart, setMaStart] = useState(() => { try { return parseFloat(localStorage.getItem("cpf_ma_start") || "0") || 0; } catch { return 0; } });
   const [activeTab, setActiveTab] = useState("summary");
+
+  useEffect(() => { try { localStorage.setItem("cpf_oa_start", oaStart); } catch {} }, [oaStart]);
+  useEffect(() => { try { localStorage.setItem("cpf_sa_start", saStart); } catch {} }, [saStart]);
+  useEffect(() => { try { localStorage.setItem("cpf_ma_start", maStart); } catch {} }, [maStart]);
 
   const monthly = useMemo(() => computeMonthly(salary, age, prYear), [salary, age, prYear]);
   const projectionData = useMemo(() => projectYears({
-    salary, age, prYear, annualIncrement, yearsToProject, oaReturn, saReturn, maReturn
-  }), [salary, age, prYear, annualIncrement, yearsToProject, oaReturn, saReturn, maReturn]);
+    salary, age, prYear, annualIncrement, yearsToProject, oaReturn, saReturn, maReturn, oaStart, saStart, maStart
+  }), [salary, age, prYear, annualIncrement, yearsToProject, oaReturn, saReturn, maReturn, oaStart, saStart, maStart]);
 
   const finalData = projectionData[projectionData.length - 1];
 
@@ -1925,13 +1932,43 @@ export default function CPFCalculator() {
           </div>
 
           {/* Right: Projection Settings */}
-          <div style={{ background: "var(--card-bg)", borderRadius: 16, padding: 24, border: "1px solid var(--border)" }}>
-            <div className="section-title">Projection Settings</div>
-            <SliderInput label="Annual Salary Increment" value={annualIncrement} onChange={setAnnualIncrement} min={0} max={15} step={0.5} suffix="%" />
-            <SliderInput label="Project Over" value={yearsToProject} onChange={setYearsToProject} min={1} max={40} step={1} suffix=" years" />
-            <SliderInput label="OA Return Rate" value={oaReturn} onChange={setOaReturn} min={0} max={8} step={0.5} suffix="%" />
-            <SliderInput label="SA Return Rate" value={saReturn} onChange={setSaReturn} min={0} max={8} step={0.5} suffix="%" />
-            <SliderInput label="MA Return Rate" value={maReturn} onChange={setMaReturn} min={0} max={8} step={0.5} suffix="%" />
+          <div style={{ display: "flex", flexDirection: "column", gap: 16, flex: "1 1 280px" }}>
+            <div style={{ background: "var(--card-bg)", borderRadius: 16, padding: 24, border: "1px solid var(--border)" }}>
+              <div className="section-title">Projection Settings</div>
+              <SliderInput label="Annual Salary Increment" value={annualIncrement} onChange={setAnnualIncrement} min={0} max={15} step={0.5} suffix="%" />
+              <SliderInput label="Project Over" value={yearsToProject} onChange={setYearsToProject} min={1} max={40} step={1} suffix=" years" />
+              <SliderInput label="OA Return Rate" value={oaReturn} onChange={setOaReturn} min={0} max={8} step={0.5} suffix="%" />
+              <SliderInput label="SA Return Rate" value={saReturn} onChange={setSaReturn} min={0} max={8} step={0.5} suffix="%" />
+              <SliderInput label="MA Return Rate" value={maReturn} onChange={setMaReturn} min={0} max={8} step={0.5} suffix="%" />
+            </div>
+            <div style={{ background: "var(--card-bg)", borderRadius: 16, padding: 24, border: "1px solid var(--border)" }}>
+              <div className="section-title">Current CPF Balances (optional)</div>
+              <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 14, lineHeight: 1.6 }}>
+                Enter your actual balances from the CPF portal. The projection will start from these figures instead of $0.
+              </div>
+              {[
+                { label: "OA Balance (S$)", value: oaStart, set: setOaStart, color: "#4ade80" },
+                { label: "SA Balance (S$)", value: saStart, set: setSaStart, color: "#818cf8" },
+                { label: "MA Balance (S$)", value: maStart, set: setMaStart, color: "#f472b6" },
+              ].map(({ label, value, set, color }) => (
+                <div key={label} style={{ marginBottom: 14 }}>
+                  <label style={{ fontSize: 13, color: "var(--label)", fontWeight: 500, display: "block", marginBottom: 6 }}>{label}</label>
+                  <input
+                    type="number"
+                    min="0"
+                    value={value || ""}
+                    placeholder="0"
+                    onChange={e => set(parseFloat(e.target.value) || 0)}
+                    style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `1px solid ${color}30`, background: `${color}08`, color: "var(--text)", fontSize: 14, fontFamily: "'DM Mono', monospace", outline: "none" }}
+                  />
+                </div>
+              ))}
+              {(oaStart > 0 || saStart > 0 || maStart > 0) && (
+                <div style={{ fontSize: 12, color: "var(--accent)", marginTop: 4 }}>
+                  Starting balance: {fmtD(oaStart + saStart + maStart)}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
