@@ -1,15 +1,15 @@
-# Retire Calculator 🇸🇬
+# Retire Calculator 🇸🇬🇲🇾
 
-A personal finance web app for Singapore PRs and Malaysians to track CPF contributions, housing loans, and US stock portfolios — all in one place.
+A personal finance web app for Singapore PRs and Malaysians to track CPF contributions, housing loans, and investment portfolios — all in one place.
 
-## Features
+## Tabs
 
-### 📈 CPF Calculator (Singapore PR)
-- Based on official CPF Board rates effective 1 January 2026
-- Supports 1st year, 2nd year, and 3rd year+ PR graduated contribution rates
-- Age-based rate adjustments (≤55, 55–60, 60–65, 65–70, 70+)
-- Breakdown across OA, SA, and MA accounts with allocation percentages
-- Configurable OA / SA / MA return rates
+### 🌐 Summary
+- At-a-glance overview of all assets across currencies (SGD · MYR · USD)
+- **CPF (SGD):** projected OA / SA / MA balances with progress bars
+- **MYR Assets:** property equity + outstanding loans + Bursa Malaysia stocks cost basis
+- **USD Investments:** US Stocks and Crypto side-by-side with allocation bars
+- No currency conversion applied — each asset shown in its native currency
 
 ### 📈 Growth Chart
 - Visualise projected CPF balance over up to 40 years
@@ -17,27 +17,40 @@ A personal finance web app for Singapore PRs and Malaysians to track CPF contrib
 - Factors in annual salary increment and compound interest
 
 ### 📋 Year-by-Year Table
-- Detailed tabular view of yearly balances and contributions
+- Detailed tabular view of yearly CPF balances and contributions
 - Columns: Year, Age, PR Year, Salary, Monthly Contribution, OA, SA, MA, Total
 
 ### 🏠 Housing Loan (Malaysia)
-- Track multiple properties — switch between them with a property selector
-- Per property: name, developer, address, type (under construction / completed)
-- Loan details: purchase price (RM), interest rate (% p.a.), tenure (up to 35 years), SPA date, VP/handover date
+- Track multiple properties with a property selector
+- Per property: name, developer, address, type (under construction / completed), purchase price (RM), interest rate (% p.a.), loan tenure (up to 35 years), SPA date, VP/handover date
 - Auto-computed monthly installment using the standard reducing balance formula
 - Summary cards: purchase price, downpayment paid, loan amount, monthly installment, total payable, total interest
-- **Downpayment records** — log each payment with date, amount, and note; running total shown
-- **Progressive interest records** (under-construction properties) — track each bank disbursement by construction stage; auto-calculates cumulative disbursed and estimated monthly interest-only payment before VP
-- All data persisted to browser localStorage
+- **Downpayment records** — log each payment with date, amount, note; running total shown
+- **Progressive interest records** (under-construction) — track each bank disbursement by construction stage; auto-calculates cumulative disbursed and estimated monthly interest-only payment before VP
 
-### 📊 US Stocks Portfolio
-- Add equity positions: ticker, shares, buy price (USD/share), fees, buy date, notes
-- **Live price fetching** from Yahoo Finance — per-row Fetch button or global Refresh All
-- Shows current price and today's daily % change (▲/▼) per position
-- Unrealised P&L per holding and in aggregate (USD and %)
-- Portfolio totals row: total invested, current value, overall P&L
-- Retry button shown if a price fetch fails
-- Holdings persisted to localStorage; prices re-fetched each session
+### 🇲🇾 MY Stocks (Bursa Malaysia)
+- Track Bursa Malaysia equity holdings in MYR
+- Enter stock code (e.g. `1155`, `MAYBANK`) — `.KL` suffix added automatically for Yahoo Finance
+- Records shares, buy price (RM/share), fees, buy date, notes
+- Live price fetching with today's daily % change (▲/▼); Bursa hours 9am–5pm MYT Mon–Fri
+- Unrealised P&L per position and in aggregate (RM and %)
+- Portfolio totals row; holdings persisted to localStorage
+
+### 📊 US Stocks
+- Track US equity holdings in USD
+- Add positions: ticker, shares, buy price (USD/share), fees, buy date, notes
+- Live price fetching from Yahoo Finance — per-row Fetch or global Refresh All
+- Today's daily % change (▲/▼), unrealised P&L per holding and in aggregate
+- Portfolio totals row; holdings persisted to localStorage
+
+### 🪙 Crypto
+- Track cryptocurrency holdings in USD
+- 35+ coins pre-mapped (BTC, ETH, SOL, BNB, DOGE, PEPE, TON, and more); unlisted tokens supported via CoinGecko coin ID
+- Live prices from CoinGecko free API with 24h % change (▲/▼)
+- Smart price formatting for large (BTC) and tiny (SHIB, PEPE) values
+- Unrealised P&L per position and in aggregate; holdings persisted to localStorage
+
+---
 
 ## CPF Rates (1 Jan 2026)
 
@@ -55,6 +68,8 @@ A personal finance web app for Singapore PRs and Malaysians to track CPF contrib
 - Recharts (area chart)
 - Vite (build tool)
 - Inline CSS with CSS custom properties (dark theme)
+- Yahoo Finance API (MY Stocks, US Stocks price data)
+- CoinGecko API (Crypto price data)
 
 ## Getting Started
 
@@ -75,7 +90,11 @@ npm run build
 
 **Housing Loan:** Monthly installment uses the reducing balance (monthly rest) formula. Actual figures depend on your bank's Base Rate (BR), BLR-linked packages, lock-in periods, and rounding. MRTA/MLTA premiums and legal fees are not included. Refer to your loan agreement for accurate figures.
 
-**US Stocks:** Live prices are sourced from Yahoo Finance and may be delayed up to 15–20 minutes during market hours. P&L is unrealised gain/loss based on cost basis. For personal record-keeping only — not financial advice.
+**MY Stocks & US Stocks:** Live prices sourced from Yahoo Finance and may be delayed up to 15–20 minutes during market hours. Bursa Malaysia trading hours: 9:00am–5:00pm MYT, Mon–Fri.
+
+**Crypto:** Live prices sourced from CoinGecko and reflect the latest available market price.
+
+All P&L figures are unrealised gain/loss based on cost basis (shares/amount × buy price + fees). For personal record-keeping only — not financial advice.
 
 ## License
 
