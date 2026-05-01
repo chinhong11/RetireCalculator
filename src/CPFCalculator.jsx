@@ -1305,6 +1305,11 @@ function CryptoTab() {
   const [refreshedAt, setRefreshedAt] = useState(null);
   const [editingPrice, setEditingPrice] = useState(new Set());
   const [manualInput, setManualInput] = useState({});
+  const [showDca, setShowDca] = useState(false);
+  const [dcaTicker, setDcaTicker] = useState("");
+  const [dcaAddAmount, setDcaAddAmount] = useState("");
+  const [dcaAddPrice, setDcaAddPrice] = useState("");
+  const [dcaAddFees, setDcaAddFees] = useState("0");
 
   useEffect(() => {
     try { localStorage.setItem("crypto_v1", JSON.stringify(holdings)); } catch {}
@@ -1380,6 +1385,32 @@ function CryptoTab() {
   const totalPnl = priced.reduce((s, h) => s + h.pnl, 0);
   const totalPnlPct = totalCost > 0 && priced.length ? (totalPnl / totalCost) * 100 : null;
   const anyFetching = fetching.size > 0;
+
+  // Aggregate all lots for the selected DCA ticker
+  const dcaPosition = useMemo(() => {
+    if (!dcaTicker) return null;
+    const lots = holdings.filter(h => h.ticker === dcaTicker);
+    if (!lots.length) return null;
+    const totalAmount = lots.reduce((s, h) => s + h.amount, 0);
+    const totalCostBasis = lots.reduce((s, h) => s + h.amount * h.buyPrice + (h.totalFees || 0), 0);
+    return { totalAmount, totalCostBasis, avgCost: totalAmount > 0 ? totalCostBasis / totalAmount : 0 };
+  }, [dcaTicker, holdings]);
+
+  // New average after the hypothetical add
+  const dcaResult = useMemo(() => {
+    if (!dcaPosition) return null;
+    const addAmt = parseFloat(dcaAddAmount);
+    const addPrice = parseFloat(dcaAddPrice);
+    const addFees = parseFloat(dcaAddFees) || 0;
+    if (!addAmt || addAmt <= 0 || !addPrice || addPrice <= 0) return null;
+    const purchaseCost = addAmt * addPrice + addFees;
+    const newAmount = dcaPosition.totalAmount + addAmt;
+    const newCostBasis = dcaPosition.totalCostBasis + purchaseCost;
+    const newAvgCost = newCostBasis / newAmount;
+    const change = newAvgCost - dcaPosition.avgCost;
+    const changePct = dcaPosition.avgCost > 0 ? (change / dcaPosition.avgCost) * 100 : 0;
+    return { newAvgCost, newAmount, newCostBasis, purchaseCost, change, changePct };
+  }, [dcaPosition, dcaAddAmount, dcaAddPrice, dcaAddFees]);
 
   const exportCryptoCsv = () => {
     const rows = enriched.map(h => ({
@@ -1480,6 +1511,142 @@ function CryptoTab() {
           <button onClick={addHolding} style={addBtnStyle}>+ Add</button>
         </div>
       </div>
+
+      {/* DCA Calculator */}
+      {holdings.length > 0 && (
+        <div style={{ background: "var(--card-bg)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 20, overflow: "hidden" }}>
+          <div style={{ padding: "18px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12 }}>
+            <div>
+              <div className="section-title" style={{ margin: 0, marginBottom: 3 }}>Cost Average Calculator</div>
+              <div style={{ fontSize: 12, color: "var(--muted)" }}>Simulate adding to a position and see the new average cost</div>
+            </div>
+            <button
+              onClick={() => setShowDca(s => !s)}
+              style={{ ...exportBtnStyle, color: showDca ? GOLD : "var(--label)", borderColor: showDca ? "rgba(251,191,36,0.3)" : "var(--border)", whiteSpace: "nowrap" }}
+            >
+              {showDca ? "▲ Hide" : "▼ Show"}
+            </button>
+          </div>
+
+          {showDca && (
+            <div style={{ borderTop: "1px solid var(--border)", padding: "20px 24px 24px" }}>
+              <div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-start" }}>
+
+                {/* Existing position */}
+                <div style={{ flex: "1 1 180px" }}>
+                  <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, marginBottom: 12 }}>Existing Position</div>
+                  <div style={{ marginBottom: 12 }}>
+                    <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Coin</label>
+                    <select className="hl-in" value={dcaTicker} onChange={e => { setDcaTicker(e.target.value); setDcaAddPrice(""); }}>
+                      <option value="">— Select coin —</option>
+                      {[...new Set(holdings.map(h => h.ticker))].map(t => (
+                        <option key={t} value={t}>{t}</option>
+                      ))}
+                    </select>
+                  </div>
+                  {dcaPosition ? (
+                    <div style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)", fontSize: 13, lineHeight: 1.9 }}>
+                      <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", columnGap: 14 }}>
+                        <span style={{ color: "var(--muted)", fontSize: 12 }}>Amount held</span>
+                        <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 600 }}>{dcaPosition.totalAmount.toPrecision(8).replace(/\.?0+$/, "")}</span>
+                        <span style={{ color: "var(--muted)", fontSize: 12 }}>Avg cost / coin</span>
+                        <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 600 }}>{fmtCoin(dcaPosition.avgCost)}</span>
+                        <span style={{ color: "var(--muted)", fontSize: 12 }}>Total invested</span>
+                        <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 600 }}>{USD(dcaPosition.totalCostBasis)}</span>
+                      </div>
+                    </div>
+                  ) : (
+                    <div style={{ padding: "16px 14px", borderRadius: 10, border: "1px dashed var(--border)", color: "var(--muted)", fontSize: 12, textAlign: "center" }}>
+                      {dcaTicker ? `No lots found for ${dcaTicker}` : "Select a coin above"}
+                    </div>
+                  )}
+                </div>
+
+                {/* New purchase */}
+                <div style={{ flex: "1 1 180px" }}>
+                  <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, marginBottom: 12 }}>New Purchase</div>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
+                    <div>
+                      <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Add Amount</label>
+                      <input className="hl-in" type="number" placeholder="0.5" value={dcaAddAmount}
+                        onChange={e => setDcaAddAmount(e.target.value)} min={0} step="any"
+                        style={{ fontFamily: "'DM Mono', monospace" }} />
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>At Price (USD / coin)</label>
+                      <input className="hl-in" type="number" placeholder="0.00" value={dcaAddPrice}
+                        onChange={e => setDcaAddPrice(e.target.value)} min={0} step="any"
+                        style={{ fontFamily: "'DM Mono', monospace" }} />
+                      {dcaTicker && prices[dcaTicker] && (
+                        <button
+                          onClick={() => setDcaAddPrice(String(prices[dcaTicker].price))}
+                          style={{ marginTop: 5, padding: "3px 8px", borderRadius: 5, border: "1px solid rgba(251,191,36,0.3)", background: "rgba(251,191,36,0.06)", color: GOLD, fontSize: 10, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" }}
+                        >
+                          Use live · {fmtCoin(prices[dcaTicker].price)}
+                        </button>
+                      )}
+                    </div>
+                    <div>
+                      <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Fees (USD)</label>
+                      <input className="hl-in" type="number" placeholder="0" value={dcaAddFees}
+                        onChange={e => setDcaAddFees(e.target.value)} min={0} step={0.01}
+                        style={{ fontFamily: "'DM Mono', monospace" }} />
+                    </div>
+                  </div>
+                </div>
+
+                {/* Results */}
+                <div style={{ flex: "1 1 200px" }}>
+                  <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, marginBottom: 12 }}>After Purchase</div>
+                  {dcaResult ? (
+                    <>
+                      <div style={{ padding: "14px 16px", borderRadius: 10, background: "rgba(251,191,36,0.06)", border: "1px solid rgba(251,191,36,0.2)", lineHeight: 1.9 }}>
+                        <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", columnGap: 14, fontSize: 13 }}>
+                          <span style={{ color: "var(--muted)", fontSize: 12 }}>New amount</span>
+                          <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 600 }}>{dcaResult.newAmount.toPrecision(8).replace(/\.?0+$/, "")}</span>
+
+                          <span style={{ color: "var(--muted)", fontSize: 12 }}>New avg cost</span>
+                          <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 800, color: GOLD, fontSize: 15 }}>{fmtCoin(dcaResult.newAvgCost)}</span>
+
+                          <span style={{ color: "var(--muted)", fontSize: 12 }}>vs current avg</span>
+                          <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 600, color: dcaResult.change <= 0 ? "#4ade80" : "#f87171" }}>
+                            {dcaResult.change >= 0 ? "+" : ""}{fmtCoin(dcaResult.change)} ({dcaResult.changePct >= 0 ? "+" : ""}{dcaResult.changePct.toFixed(2)}%)
+                          </span>
+
+                          <span style={{ color: "var(--muted)", fontSize: 12 }}>New total invested</span>
+                          <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 600 }}>{USD(dcaResult.newCostBasis)}</span>
+
+                          <span style={{ color: "var(--muted)", fontSize: 12 }}>This purchase</span>
+                          <span style={{ fontFamily: "'DM Mono', monospace", color: "var(--label)" }}>{USD(dcaResult.purchaseCost)}</span>
+                        </div>
+                      </div>
+
+                      {dcaTicker && prices[dcaTicker] && (() => {
+                        const live = prices[dcaTicker].price;
+                        const pnlPct = ((live - dcaResult.newAvgCost) / dcaResult.newAvgCost) * 100;
+                        const pnl = (live - dcaResult.newAvgCost) * dcaResult.newAmount;
+                        return (
+                          <div style={{ marginTop: 10, padding: "10px 14px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 12 }}>
+                            <div style={{ color: "var(--muted)", marginBottom: 3 }}>P&amp;L at live price ({fmtCoin(live)})</div>
+                            <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, color: pnlPct >= 0 ? "#4ade80" : "#f87171" }}>
+                              {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}% &nbsp;·&nbsp; {pnl >= 0 ? "+" : ""}{USD(pnl)}
+                            </div>
+                          </div>
+                        );
+                      })()}
+                    </>
+                  ) : (
+                    <div style={{ padding: "20px 16px", borderRadius: 10, border: "1px dashed var(--border)", textAlign: "center", color: "var(--muted)", fontSize: 12 }}>
+                      {dcaPosition ? "Enter add amount and price" : "Select a coin to get started"}
+                    </div>
+                  )}
+                </div>
+
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Holdings Table */}
       {enriched.length > 0 ? (
