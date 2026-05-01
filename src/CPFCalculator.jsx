@@ -404,6 +404,8 @@ function HousingLoanTab() {
 
   const [dpForm, setDpForm] = useState({ date: "", amount: "", note: "" });
   const [prForm, setPrForm] = useState({ month: "", claimAmount: "", stage: "", note: "" });
+  const [showAmort, setShowAmort] = useState(false);
+  const [amortYear, setAmortYear] = useState(1);
 
   useEffect(() => {
     try { localStorage.setItem("hl_props_v1", JSON.stringify(properties)); } catch {}
@@ -471,6 +473,43 @@ function HousingLoanTab() {
   }, [prop]);
 
   const totalProgInterest = progressiveTimeline.reduce((s, r) => s + r.monthlyInterest, 0);
+
+  const amortSchedule = useMemo(() => {
+    if (!loanAmount || !prop?.interestRate || !prop?.tenure || !monthlyInstallment) return [];
+    const r = prop.interestRate / 100 / 12;
+    const n = prop.tenure * 12;
+    let balance = loanAmount;
+
+    // Derive the first repayment month from property dates
+    const refStr = prop.type === "under_construction" ? prop.vpDate : prop.spaDate;
+    let startDate = refStr ? new Date(refStr + "-01") : null;
+    if (startDate && prop.type !== "under_construction") {
+      // Completed/subsale: loan starts ~1 month after SPA
+      startDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 1);
+    }
+
+    return Array.from({ length: n }, (_, idx) => {
+      const i = idx + 1;
+      const interest = balance * r;
+      const principal = Math.min(monthlyInstallment - interest, balance);
+      const closing = Math.max(0, balance - principal);
+      let dateStr = "";
+      if (startDate) {
+        const d = new Date(startDate.getFullYear(), startDate.getMonth() + idx, 1);
+        dateStr = d.toLocaleDateString("en-MY", { month: "short", year: "numeric" });
+      }
+      const row = { month: i, year: Math.ceil(i / 12), date: dateStr, opening: balance, principal, interest, closing };
+      balance = closing;
+      return row;
+    });
+  }, [loanAmount, prop?.interestRate, prop?.tenure, monthlyInstallment, prop?.vpDate, prop?.spaDate, prop?.type]);
+
+  const amortTotalInterest = amortSchedule.reduce((s, r) => s + r.interest, 0);
+  const amortTotalPrincipal = amortSchedule.reduce((s, r) => s + r.principal, 0);
+  const amortHasDate = amortSchedule.length > 0 && !!amortSchedule[0].date;
+  const amortYearRows = amortSchedule.filter(r => r.year === amortYear);
+  const amortYearInterest = amortYearRows.reduce((s, r) => s + r.interest, 0);
+  const amortYearPrincipal = amortYearRows.reduce((s, r) => s + r.principal, 0);
 
   if (!prop) return null;
 
@@ -542,6 +581,20 @@ function HousingLoanTab() {
     padding: "8px 18px", borderRadius: 8, background: "rgba(110,231,183,0.12)",
     color: "var(--accent)", border: "1px solid rgba(110,231,183,0.25)",
     cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", whiteSpace: "nowrap",
+  };
+
+  const exportAmortCsv = () => {
+    const rows = amortSchedule.map(r => ({
+      Month: r.month, ...(amortHasDate ? { Date: r.date } : {}),
+      "Opening Balance (MYR)": r.opening.toFixed(2),
+      "Principal (MYR)": r.principal.toFixed(2),
+      "Interest (MYR)": r.interest.toFixed(2),
+      "Closing Balance (MYR)": r.closing.toFixed(2),
+    }));
+    downloadBlob(
+      `amortization-${prop.name.replace(/\s+/g, "-")}-${new Date().toISOString().slice(0, 10)}.csv`,
+      toCsv(rows), "text/csv"
+    );
   };
 
   const exportBtnStyle = {
@@ -619,6 +672,111 @@ function HousingLoanTab() {
         <StatCard label="Total Payable" value={RM(totalPayable)} sub="Over full tenure" color="#fbbf24" />
         <StatCard label="Total Interest" value={RM(totalInterest)} sub={loanAmount > 0 ? `${((totalInterest / loanAmount) * 100).toFixed(1)}% of loan` : "—"} color="#f87171" />
       </div>
+
+      {/* Amortization Schedule */}
+      {loanAmount > 0 && prop.tenure > 0 && (
+        <div style={{ background: "var(--card-bg)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 20, overflow: "hidden" }}>
+          {/* Header row */}
+          <div style={{ padding: "20px 24px", display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+            <div>
+              <div className="section-title" style={{ margin: 0, marginBottom: 4 }}>Amortization Schedule</div>
+              <div style={{ fontSize: 12, color: "var(--muted)" }}>
+                {prop.tenure * 12} monthly payments · {RM2(monthlyInstallment)}/month
+                {amortHasDate && amortSchedule[0]?.date && ` · Starting ${amortSchedule[0].date}`}
+              </div>
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {showAmort && (
+                <button style={exportBtnStyle} onClick={exportAmortCsv}>↓ CSV</button>
+              )}
+              <button
+                onClick={() => setShowAmort(s => !s)}
+                style={{ ...exportBtnStyle, color: showAmort ? "var(--accent)" : "var(--label)", borderColor: showAmort ? "rgba(110,231,183,0.3)" : "var(--border)" }}
+              >
+                {showAmort ? "▲ Hide" : "▼ Show Schedule"}
+              </button>
+            </div>
+          </div>
+
+          {showAmort && (
+            <>
+              {/* Lifetime summary mini-cards */}
+              <div style={{ display: "flex", gap: 12, padding: "0 24px 20px", flexWrap: "wrap" }}>
+                {[
+                  { label: "Total Principal", val: RM(amortTotalPrincipal), color: "var(--accent)" },
+                  { label: "Total Interest", val: RM(amortTotalInterest), color: "#f87171" },
+                  { label: "Interest / Loan", val: loanAmount > 0 ? `${((amortTotalInterest / loanAmount) * 100).toFixed(1)}%` : "—", color: "#fbbf24" },
+                  { label: "Total Cost", val: RM(amortTotalPrincipal + amortTotalInterest), color: "#e8eaf0" },
+                ].map(({ label, val, color }) => (
+                  <div key={label} style={{ flex: "1 1 120px", padding: "12px 16px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)" }}>
+                    <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, marginBottom: 4 }}>{label}</div>
+                    <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, fontSize: 15, color }}>{val}</div>
+                  </div>
+                ))}
+              </div>
+
+              {/* Year selector */}
+              <div style={{ padding: "0 24px 16px", display: "flex", gap: 6, flexWrap: "wrap" }}>
+                {Array.from({ length: prop.tenure }, (_, i) => i + 1).map(y => (
+                  <button
+                    key={y}
+                    onClick={() => setAmortYear(y)}
+                    style={{
+                      padding: "4px 12px", borderRadius: 6, border: "1px solid",
+                      borderColor: amortYear === y ? "rgba(110,231,183,0.35)" : "var(--border)",
+                      background: amortYear === y ? "rgba(110,231,183,0.1)" : "transparent",
+                      color: amortYear === y ? "var(--accent)" : "var(--muted)",
+                      fontSize: 12, fontWeight: 600, cursor: "pointer", fontFamily: "inherit",
+                    }}
+                  >
+                    Yr {y}
+                  </button>
+                ))}
+              </div>
+
+              {/* Table */}
+              <div style={{ borderTop: "1px solid var(--border)", overflowX: "auto" }}>
+                <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
+                  <thead>
+                    <tr style={{ background: "rgba(255,255,255,0.02)" }}>
+                      {[
+                        ["Mo.", "center"],
+                        ...(amortHasDate ? [["Date", "left"]] : []),
+                        ["Opening Balance", "right"],
+                        ["Principal", "right"],
+                        ["Interest", "right"],
+                        ["Closing Balance", "right"],
+                      ].map(([h, align]) => (
+                        <th key={h} style={{ padding: "10px 14px", textAlign: align, fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap", borderBottom: "1px solid var(--border)" }}>{h}</th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {amortYearRows.map((r, i) => (
+                      <tr key={r.month} style={{ borderBottom: "1px solid var(--border)", background: i % 2 ? "rgba(255,255,255,0.01)" : "transparent" }}>
+                        <td style={{ padding: "9px 14px", textAlign: "center", color: "var(--muted)", fontFamily: "'DM Mono', monospace", fontSize: 12 }}>{r.month}</td>
+                        {amortHasDate && <td style={{ padding: "9px 14px", color: "var(--label)", whiteSpace: "nowrap", fontSize: 12 }}>{r.date}</td>}
+                        <td style={{ padding: "9px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: "var(--label)" }}>{RM2(r.opening)}</td>
+                        <td style={{ padding: "9px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 600, color: "var(--accent)" }}>{RM2(r.principal)}</td>
+                        <td style={{ padding: "9px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: "#f87171" }}>{RM2(r.interest)}</td>
+                        <td style={{ padding: "9px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 600 }}>{RM2(r.closing)}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                  <tfoot>
+                    <tr style={{ borderTop: "2px solid var(--border)", background: "rgba(255,255,255,0.02)" }}>
+                      <td colSpan={amortHasDate ? 3 : 2} style={{ padding: "10px 14px", fontWeight: 700, color: "var(--label)", fontSize: 12 }}>Year {amortYear} Totals</td>
+                      <td style={{ padding: "10px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 800, color: "var(--accent)" }}>{RM2(amortYearPrincipal)}</td>
+                      <td style={{ padding: "10px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 800, color: "#f87171" }}>{RM2(amortYearInterest)}</td>
+                      <td />
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </>
+          )}
+        </div>
+      )}
 
       {/* Downpayment Records */}
       <div style={{ background: "var(--card-bg)", borderRadius: 16, padding: 24, border: "1px solid var(--border)", marginBottom: 20 }}>
