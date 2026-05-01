@@ -24,6 +24,11 @@ export default function StocksTab() {
     try { localStorage.setItem("stocks_v1", JSON.stringify(holdings)); } catch {}
   }, [holdings]);
 
+  useEffect(() => {
+    if (Object.keys(prices).length === 0) return;
+    try { localStorage.setItem("stocks_prices_v1", JSON.stringify(prices)); } catch {}
+  }, [prices]);
+
   const fetchPrice = async (ticker) => {
     setFetching(s => new Set([...s, ticker]));
     setFetchErrors(e => { const n = { ...e }; delete n[ticker]; return n; });

@@ -29,6 +29,11 @@ export default function CryptoTab() {
     try { localStorage.setItem("crypto_v1", JSON.stringify(holdings)); } catch {}
   }, [holdings]);
 
+  useEffect(() => {
+    if (Object.keys(prices).length === 0) return;
+    try { localStorage.setItem("crypto_prices_v1", JSON.stringify(prices)); } catch {}
+  }, [prices]);
+
   const fetchPrice = async (ticker) => {
     const coinId = COIN_IDS[ticker.toUpperCase()] || ticker.toLowerCase();
     setFetching(s => new Set([...s, ticker]));

@@ -35,10 +35,31 @@ export default function NetWorthTab({ projectionData, yearsToProject }) {
     });
   }, [epfSettings, yearsToProject]);
 
-  const stocksCost    = stockHoldings.reduce((s, h)  => s + h.shares * h.avgCost + (h.totalFees || 0), 0);
-  const cryptoCost    = cryptoHoldings.reduce((s, h) => s + h.amount * h.buyPrice + (h.totalFees || 0), 0);
-  const myStockCost   = myStocks.reduce((s, h)       => s + h.shares * h.avgCost + (h.totalFees || 0), 0);
-  const fdPrincipal   = fdList.reduce((s, fd)        => s + (parseFloat(fd.principal) || 0), 0);
+  // Live price caches written by portfolio tabs when prices are fetched
+  const stockPrices   = useMemo(() => { try { return JSON.parse(localStorage.getItem("stocks_prices_v1")   || "{}"); } catch { return {}; } }, []);
+  const cryptoPrices  = useMemo(() => { try { return JSON.parse(localStorage.getItem("crypto_prices_v1")   || "{}"); } catch { return {}; } }, []);
+  const myStockPrices = useMemo(() => { try { return JSON.parse(localStorage.getItem("mystocks_prices_v1") || "{}"); } catch { return {}; } }, []);
+
+  // Per-holding market value: live price × qty when available, cost basis otherwise
+  const stocksValue  = stockHoldings.reduce((s, h) => {
+    const lp = stockPrices[h.ticker];
+    return s + (lp ? h.shares * lp.price : h.shares * h.avgCost + (h.totalFees || 0));
+  }, 0);
+  const cryptoValue  = cryptoHoldings.reduce((s, h) => {
+    const lp = cryptoPrices[h.ticker];
+    return s + (lp ? h.amount * lp.price : h.amount * h.buyPrice + (h.totalFees || 0));
+  }, 0);
+  const myStockValue = myStocks.reduce((s, h) => {
+    const lp = myStockPrices[h.code];
+    return s + (lp ? h.shares * lp.price : h.shares * h.avgCost + (h.totalFees || 0));
+  }, 0);
+
+  // Track which categories are using live prices vs cost basis
+  const stocksLive   = stockHoldings.some(h => stockPrices[h.ticker]);
+  const cryptoLive   = cryptoHoldings.some(h => cryptoPrices[h.ticker]);
+  const myStocksLive = myStocks.some(h => myStockPrices[h.code]);
+
+  const fdPrincipal   = fdList.reduce((s, fd) => s + (parseFloat(fd.principal) || 0), 0);
   const housingEquity = properties.reduce((s, p) => {
     const paid = (p.downpaymentRecords || []).reduce((a, r) => a + (r.amount || 0), 0);
     return s + paid;
@@ -52,8 +73,8 @@ export default function NetWorthTab({ projectionData, yearsToProject }) {
       const epfMYR   = i === 0 ? epfStart : (epfProjection[i - 1]?.total ?? epfStart);
       const epf      = Math.round(epfMYR * myrToSgd);
       const housing  = Math.round(housingEquity * myrToSgd);
-      const myStk    = Math.round(myStockCost * myrToSgd);
-      const usAssets = Math.round((stocksCost + cryptoCost) * usdToSgd);
+      const myStk    = Math.round(myStockValue * myrToSgd);
+      const usAssets = Math.round((stocksValue + cryptoValue) * usdToSgd);
       const fds      = Math.round(fdPrincipal * myrToSgd);
       return {
         year: i,
@@ -62,7 +83,7 @@ export default function NetWorthTab({ projectionData, yearsToProject }) {
         total: cpf + epf + housing + myStk + usAssets + fds,
       };
     });
-  }, [projectionData, epfProjection, epfStart, myrToSgd, usdToSgd, housingEquity, myStockCost, stocksCost, cryptoCost, fdPrincipal]);
+  }, [projectionData, epfProjection, epfStart, myrToSgd, usdToSgd, housingEquity, myStockValue, stocksValue, cryptoValue, fdPrincipal]);
 
   const today  = chartData[0] || {};
   const finale = chartData[chartData.length - 1] || {};
@@ -72,12 +93,12 @@ export default function NetWorthTab({ projectionData, yearsToProject }) {
   const cardStyle  = { borderRadius: 12, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)" };
 
   const SERIES = [
-    { key: "cpf",      label: "CPF (SGD)",            color: "#6ee7b7", note: "projected" },
-    { key: "epf",      label: "EPF (MYR→SGD)",         color: "#6366f1", note: epfSettings.wage ? "projected" : "snapshot" },
-    { key: "housing",  label: "Housing Equity (MYR)",  color: "#f472b6", note: "snapshot" },
-    { key: "myStk",    label: "MY Stocks (MYR)",       color: "#38bdf8", note: "snapshot" },
-    { key: "usAssets", label: "US Stocks+Crypto (USD)", color: "#fbbf24", note: "snapshot" },
-    { key: "fds",      label: "Fixed Deposits (MYR)",  color: "#34d399", note: "snapshot" },
+    { key: "cpf",      label: "CPF (SGD)",             color: "#6ee7b7", note: "projected" },
+    { key: "epf",      label: "EPF (MYR→SGD)",          color: "#6366f1", note: epfSettings.wage ? "projected" : "cost basis" },
+    { key: "housing",  label: "Housing Equity (MYR)",   color: "#f472b6", note: "cost basis" },
+    { key: "myStk",    label: "MY Stocks (MYR)",        color: "#38bdf8", note: myStocksLive ? "live" : "cost basis" },
+    { key: "usAssets", label: "US Stocks+Crypto (USD)", color: "#fbbf24", note: (stocksLive || cryptoLive) ? "live" : "cost basis" },
+    { key: "fds",      label: "Fixed Deposits (MYR)",   color: "#34d399", note: "principal" },
   ].filter(s => (today[s.key] || 0) > 0 || s.key === "cpf");
 
   const gradId = k => `nwGrad_${k}`;
@@ -173,7 +194,9 @@ export default function NetWorthTab({ projectionData, yearsToProject }) {
             <div key={key} style={{ display: "flex", alignItems: "center", gap: 5 }}>
               <div style={{ width: 10, height: 10, borderRadius: 2, background: color, flexShrink: 0 }} />
               <span style={{ fontSize: 11, color: "var(--muted)" }}>{label}</span>
-              {note === "snapshot" && <span style={{ fontSize: 10, color: "var(--muted)", fontStyle: "italic" }}>(flat)</span>}
+              {note === "live"       && <span style={{ fontSize: 10, color: "#6ee7b7", fontStyle: "italic" }}>● live</span>}
+              {note === "cost basis" && <span style={{ fontSize: 10, color: "var(--muted)", fontStyle: "italic" }}>(cost basis)</span>}
+              {note === "principal"  && <span style={{ fontSize: 10, color: "var(--muted)", fontStyle: "italic" }}>(principal)</span>}
             </div>
           ))}
         </div>
@@ -211,7 +234,7 @@ export default function NetWorthTab({ projectionData, yearsToProject }) {
       </div>
 
       <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7 }}>
-        <strong style={{ color: "var(--label)" }}>Note:</strong> CPF and EPF are projected year-by-year using their respective contribution and return settings. Housing equity, MY/US Stocks, Crypto, and Fixed Deposits are shown at their current cost basis (flat — no future appreciation assumed). FX rates are user-defined and not auto-fetched. For personal planning only — not financial advice.
+        <strong style={{ color: "var(--label)" }}>Note:</strong> Stocks and crypto use <strong style={{ color: "var(--label)" }}>live market prices</strong> when available (fetched in the portfolio tabs) — labelled <span style={{ color: "#6ee7b7" }}>● live</span> in the legend. When no prices have been fetched yet, cost basis is used instead. CPF and EPF are projected year-by-year. Housing equity reflects downpayments recorded. FX rates are user-defined. All snapshot values are flat (no future appreciation assumed). For personal planning only — not financial advice.
       </div>
     </div>
   );

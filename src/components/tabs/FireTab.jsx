@@ -42,10 +42,30 @@ export default function FireTab({ projectionData, yearsToProject }) {
     });
   }, [epfSettings, yearsToProject]);
 
-  const stocksCost    = stockHoldings.reduce((s, h)  => s + h.shares * h.avgCost + (h.totalFees || 0), 0);
-  const cryptoCost    = cryptoHoldings.reduce((s, h) => s + h.amount * h.buyPrice + (h.totalFees || 0), 0);
-  const myStockCost   = myStocks.reduce((s, h)       => s + h.shares * h.avgCost + (h.totalFees || 0), 0);
-  const fdPrincipal   = fdList.reduce((s, fd)        => s + (parseFloat(fd.principal) || 0), 0);
+  // Live price caches written by portfolio tabs when prices are fetched
+  const stockPrices   = useMemo(() => { try { return JSON.parse(localStorage.getItem("stocks_prices_v1")   || "{}"); } catch { return {}; } }, []);
+  const cryptoPrices  = useMemo(() => { try { return JSON.parse(localStorage.getItem("crypto_prices_v1")   || "{}"); } catch { return {}; } }, []);
+  const myStockPrices = useMemo(() => { try { return JSON.parse(localStorage.getItem("mystocks_prices_v1") || "{}"); } catch { return {}; } }, []);
+
+  // Per-holding market value: live price × qty when available, cost basis otherwise
+  const stocksValue  = stockHoldings.reduce((s, h) => {
+    const lp = stockPrices[h.ticker];
+    return s + (lp ? h.shares * lp.price : h.shares * h.avgCost + (h.totalFees || 0));
+  }, 0);
+  const cryptoValue  = cryptoHoldings.reduce((s, h) => {
+    const lp = cryptoPrices[h.ticker];
+    return s + (lp ? h.amount * lp.price : h.amount * h.buyPrice + (h.totalFees || 0));
+  }, 0);
+  const myStockValue = myStocks.reduce((s, h) => {
+    const lp = myStockPrices[h.code];
+    return s + (lp ? h.shares * lp.price : h.shares * h.avgCost + (h.totalFees || 0));
+  }, 0);
+
+  const usingLivePrices = stockHoldings.some(h => stockPrices[h.ticker])
+    || cryptoHoldings.some(h => cryptoPrices[h.ticker])
+    || myStocks.some(h => myStockPrices[h.code]);
+
+  const fdPrincipal   = fdList.reduce((s, fd) => s + (parseFloat(fd.principal) || 0), 0);
   const housingEquity = properties.reduce((s, p) => s + (p.downpaymentRecords || []).reduce((a, r) => a + (r.amount || 0), 0), 0);
   const epfStart      = epfSettings.startPer + epfSettings.startSej + epfSettings.startFlek;
 
@@ -63,10 +83,10 @@ export default function FireTab({ projectionData, yearsToProject }) {
     const cpf          = d.total;
     const epfMYR       = i === 0 ? epfStart : (epfProjection[i - 1]?.total ?? epfStart);
     const epf          = includeEpf ? Math.round(epfMYR * myrToSgd) : 0;
-    const staticAssets = Math.round((housingEquity + myStockCost + fdPrincipal) * myrToSgd + (stocksCost + cryptoCost) * usdToSgd);
+    const staticAssets = Math.round((housingEquity + myStockValue + fdPrincipal) * myrToSgd + (stocksValue + cryptoValue) * usdToSgd);
     const cash         = includeCash ? Math.round(monthlySavings * 12 * i) : 0;
     return { year: i, age: d.age, cpf, epf, staticAssets, cash, total: cpf + epf + staticAssets + cash, fireTarget: fireNumber };
-  }), [projectionData, epfProjection, epfStart, myrToSgd, usdToSgd, housingEquity, myStockCost, fdPrincipal, stocksCost, cryptoCost, monthlySavings, includeEpf, includeCash, fireNumber]);
+  }), [projectionData, epfProjection, epfStart, myrToSgd, usdToSgd, housingEquity, myStockValue, fdPrincipal, stocksValue, cryptoValue, monthlySavings, includeEpf, includeCash, fireNumber]);
 
   const currentWealth = combinedProjection[0]?.total || 0;
   const fireProgress  = fireNumber > 0 ? Math.min(100, (currentWealth / fireNumber) * 100) : 0;
@@ -264,7 +284,7 @@ export default function FireTab({ projectionData, yearsToProject }) {
       </div>
 
       <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7 }}>
-        <strong style={{ color: "var(--label)" }}>Note:</strong> FIRE number = Annual expenses ÷ Safe withdrawal rate. The 4% rule originates from the Trinity Study (US equities, 30-year horizon). CPF and EPF are projected using their respective tab settings. Other assets are at current cost basis (no future growth assumed). Cash savings are projected at a flat monthly rate. For planning purposes only — not financial advice.
+        <strong style={{ color: "var(--label)" }}>Note:</strong> FIRE number = Annual expenses ÷ Safe withdrawal rate. The 4% rule originates from the Trinity Study (US equities, 30-year horizon). CPF and EPF are projected using their respective tab settings. Stocks and crypto use <strong style={{ color: "var(--label)" }}>{usingLivePrices ? "live market prices" : "cost basis (no prices fetched yet)"}</strong> — visit the portfolio tabs and fetch prices for a more accurate net worth. Housing equity and Fixed Deposits are static (no future appreciation). Cash savings are projected at a flat monthly rate. For planning purposes only — not financial advice.
       </div>
     </div>
   );

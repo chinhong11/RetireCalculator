@@ -24,6 +24,11 @@ export default function MYStocksTab() {
     try { localStorage.setItem("mystocks_v1", JSON.stringify(holdings)); } catch {}
   }, [holdings]);
 
+  useEffect(() => {
+    if (Object.keys(prices).length === 0) return;
+    try { localStorage.setItem("mystocks_prices_v1", JSON.stringify(prices)); } catch {}
+  }, [prices]);
+
   const toYahooTicker = (code) => {
     const c = code.toUpperCase().trim();
     return c.endsWith(".KL") ? c : c + ".KL";
