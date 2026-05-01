@@ -938,6 +938,8 @@ function StocksTab() {
   const [fetchErrors, setFetchErrors] = useState({});
   const [form, setForm] = useState({ ticker: "", shares: "", avgCost: "", fees: "0", buyDate: "", notes: "" });
   const [refreshedAt, setRefreshedAt] = useState(null);
+  const [editingPrice, setEditingPrice] = useState(new Set());
+  const [manualInput, setManualInput] = useState({});
 
   useEffect(() => {
     try { localStorage.setItem("stocks_v1", JSON.stringify(holdings)); } catch {}
@@ -973,6 +975,19 @@ function StocksTab() {
     tickers.forEach(fetchPrice);
     setRefreshedAt(Date.now());
   };
+
+  const commitManual = (ticker) => {
+    const val = parseFloat(manualInput[ticker]);
+    if (!isNaN(val) && val > 0) {
+      setPrices(p => ({ ...p, [ticker]: { price: val, prevClose: null, manual: true, at: Date.now() } }));
+      setFetchErrors(e => { const n = { ...e }; delete n[ticker]; return n; });
+    }
+    setEditingPrice(s => { const n = new Set(s); n.delete(ticker); return n; });
+    setManualInput(m => { const n = { ...m }; delete n[ticker]; return n; });
+  };
+
+  const startEditing = (ticker) => setEditingPrice(s => new Set([...s, ticker]));
+  const cancelEditing = (ticker) => setEditingPrice(s => { const n = new Set(s); n.delete(ticker); return n; });
 
   const addHolding = () => {
     const ticker = form.ticker.toUpperCase().trim();
@@ -1160,26 +1175,43 @@ function StocksTab() {
                       <td style={{ padding: "12px 14px", textAlign: "right" }}>
                         {isLoading ? (
                           <span style={{ color: "var(--muted)", fontSize: 12 }}>Loading…</span>
+                        ) : editingPrice.has(h.ticker) ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
+                            <input
+                              autoFocus type="number" step="0.0001" min="0" placeholder="0.00"
+                              value={manualInput[h.ticker] || ""}
+                              onChange={e => setManualInput(m => ({ ...m, [h.ticker]: e.target.value }))}
+                              onKeyDown={e => { if (e.key === "Enter") commitManual(h.ticker); if (e.key === "Escape") cancelEditing(h.ticker); }}
+                              style={{ width: 80, padding: "4px 7px", borderRadius: 6, border: "1px solid var(--accent)", background: "rgba(110,231,183,0.08)", color: "var(--text)", fontFamily: "'DM Mono', monospace", fontSize: 12, outline: "none" }}
+                            />
+                            <button onClick={() => commitManual(h.ticker)} style={{ color: "var(--accent)", background: "none", border: "none", cursor: "pointer", fontSize: 15, padding: "2px 3px", lineHeight: 1 }} title="Confirm">✓</button>
+                            <button onClick={() => cancelEditing(h.ticker)} style={{ color: "var(--muted)", background: "none", border: "none", cursor: "pointer", fontSize: 13, padding: "2px 3px", lineHeight: 1 }} title="Cancel">✕</button>
+                          </div>
                         ) : err ? (
-                          <button onClick={() => fetchPrice(h.ticker)} style={{ color: "#f87171", background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: 0 }} title={err}>
-                            ⚠ Retry
-                          </button>
+                          <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                            <div style={{ display: "flex", gap: 6 }}>
+                              <button onClick={() => fetchPrice(h.ticker)} style={{ color: "#f87171", background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: 0 }} title={err}>⚠ Retry</button>
+                              <button onClick={() => startEditing(h.ticker)} style={{ color: "var(--muted)", background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: 0 }} title="Enter price manually">✎ Manual</button>
+                            </div>
+                          </div>
                         ) : h.pd ? (
                           <div>
-                            <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>{USD(h.pd.price)}</div>
-                            {h.pd.prevClose != null && (() => {
+                            <div style={{ display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}>
+                              <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>{USD(h.pd.price)}</div>
+                              <button onClick={() => startEditing(h.ticker)} style={{ color: "var(--muted)", background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: 0, opacity: 0.5, lineHeight: 1 }} title="Override price">✎</button>
+                            </div>
+                            {h.pd.manual ? (
+                              <div style={{ fontSize: 10, color: "var(--muted)", fontStyle: "italic" }}>manual</div>
+                            ) : h.pd.prevClose != null && (() => {
                               const chg = ((h.pd.price - h.pd.prevClose) / h.pd.prevClose) * 100;
-                              return (
-                                <div style={{ fontSize: 11, color: chg >= 0 ? "#4ade80" : "#f87171" }}>
-                                  {chg >= 0 ? "▲" : "▼"} {Math.abs(chg).toFixed(2)}% today
-                                </div>
-                              );
+                              return <div style={{ fontSize: 11, color: chg >= 0 ? "#4ade80" : "#f87171" }}>{chg >= 0 ? "▲" : "▼"} {Math.abs(chg).toFixed(2)}% today</div>;
                             })()}
                           </div>
                         ) : (
-                          <button onClick={() => fetchPrice(h.ticker)} style={{ padding: "4px 10px", borderRadius: 6, background: "rgba(110,231,183,0.1)", color: "var(--accent)", border: "1px solid rgba(110,231,183,0.2)", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>
-                            Fetch
-                          </button>
+                          <div style={{ display: "flex", gap: 5, justifyContent: "flex-end" }}>
+                            <button onClick={() => fetchPrice(h.ticker)} style={{ padding: "4px 10px", borderRadius: 6, background: "rgba(110,231,183,0.1)", color: "var(--accent)", border: "1px solid rgba(110,231,183,0.2)", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Fetch</button>
+                            <button onClick={() => startEditing(h.ticker)} style={{ padding: "4px 8px", borderRadius: 6, background: "transparent", color: "var(--muted)", border: "1px solid var(--border)", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }} title="Enter price manually">✎</button>
+                          </div>
                         )}
                       </td>
                       <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace" }}>
@@ -1271,6 +1303,8 @@ function CryptoTab() {
   const [fetchErrors, setFetchErrors] = useState({});
   const [form, setForm] = useState({ ticker: "", amount: "", buyPrice: "", fees: "0", buyDate: "", notes: "" });
   const [refreshedAt, setRefreshedAt] = useState(null);
+  const [editingPrice, setEditingPrice] = useState(new Set());
+  const [manualInput, setManualInput] = useState({});
 
   useEffect(() => {
     try { localStorage.setItem("crypto_v1", JSON.stringify(holdings)); } catch {}
@@ -1302,6 +1336,19 @@ function CryptoTab() {
     tickers.forEach(fetchPrice);
     setRefreshedAt(Date.now());
   };
+
+  const commitManual = (ticker) => {
+    const val = parseFloat(manualInput[ticker]);
+    if (!isNaN(val) && val > 0) {
+      setPrices(p => ({ ...p, [ticker]: { price: val, change24h: null, manual: true, at: Date.now() } }));
+      setFetchErrors(e => { const n = { ...e }; delete n[ticker]; return n; });
+    }
+    setEditingPrice(s => { const n = new Set(s); n.delete(ticker); return n; });
+    setManualInput(m => { const n = { ...m }; delete n[ticker]; return n; });
+  };
+
+  const startEditing = (ticker) => setEditingPrice(s => new Set([...s, ticker]));
+  const cancelEditing = (ticker) => setEditingPrice(s => { const n = new Set(s); n.delete(ticker); return n; });
 
   const addHolding = () => {
     const ticker = form.ticker.toUpperCase().trim();
@@ -1477,19 +1524,42 @@ function CryptoTab() {
                       <td style={{ padding: "12px 14px", textAlign: "right" }}>
                         {isLoading ? (
                           <span style={{ color: "var(--muted)", fontSize: 12 }}>Loading…</span>
+                        ) : editingPrice.has(h.ticker) ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
+                            <input
+                              autoFocus type="number" step="0.000001" min="0" placeholder="0.00"
+                              value={manualInput[h.ticker] || ""}
+                              onChange={e => setManualInput(m => ({ ...m, [h.ticker]: e.target.value }))}
+                              onKeyDown={e => { if (e.key === "Enter") commitManual(h.ticker); if (e.key === "Escape") cancelEditing(h.ticker); }}
+                              style={{ width: 80, padding: "4px 7px", borderRadius: 6, border: `1px solid ${GOLD}`, background: "rgba(251,191,36,0.08)", color: "var(--text)", fontFamily: "'DM Mono', monospace", fontSize: 12, outline: "none" }}
+                            />
+                            <button onClick={() => commitManual(h.ticker)} style={{ color: GOLD, background: "none", border: "none", cursor: "pointer", fontSize: 15, padding: "2px 3px", lineHeight: 1 }} title="Confirm">✓</button>
+                            <button onClick={() => cancelEditing(h.ticker)} style={{ color: "var(--muted)", background: "none", border: "none", cursor: "pointer", fontSize: 13, padding: "2px 3px", lineHeight: 1 }} title="Cancel">✕</button>
+                          </div>
                         ) : err ? (
-                          <button onClick={() => fetchPrice(h.ticker)} style={{ color: "#f87171", background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: 0 }} title={err}>⚠ Retry</button>
+                          <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                            <button onClick={() => fetchPrice(h.ticker)} style={{ color: "#f87171", background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: 0 }} title={err}>⚠ Retry</button>
+                            <button onClick={() => startEditing(h.ticker)} style={{ color: "var(--muted)", background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: 0 }} title="Enter price manually">✎ Manual</button>
+                          </div>
                         ) : h.pd ? (
                           <div>
-                            <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>{fmtCoin(h.pd.price)}</div>
-                            {h.pd.change24h != null && (
+                            <div style={{ display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}>
+                              <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>{fmtCoin(h.pd.price)}</div>
+                              <button onClick={() => startEditing(h.ticker)} style={{ color: "var(--muted)", background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: 0, opacity: 0.5, lineHeight: 1 }} title="Override price">✎</button>
+                            </div>
+                            {h.pd.manual ? (
+                              <div style={{ fontSize: 10, color: "var(--muted)", fontStyle: "italic" }}>manual</div>
+                            ) : h.pd.change24h != null && (
                               <div style={{ fontSize: 11, color: h.pd.change24h >= 0 ? "#4ade80" : "#f87171" }}>
                                 {h.pd.change24h >= 0 ? "▲" : "▼"} {Math.abs(h.pd.change24h).toFixed(2)}% 24h
                               </div>
                             )}
                           </div>
                         ) : (
-                          <button onClick={() => fetchPrice(h.ticker)} style={{ padding: "4px 10px", borderRadius: 6, background: "rgba(251,191,36,0.1)", color: GOLD, border: "1px solid rgba(251,191,36,0.2)", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Fetch</button>
+                          <div style={{ display: "flex", gap: 5, justifyContent: "flex-end" }}>
+                            <button onClick={() => fetchPrice(h.ticker)} style={{ padding: "4px 10px", borderRadius: 6, background: "rgba(251,191,36,0.1)", color: GOLD, border: "1px solid rgba(251,191,36,0.2)", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Fetch</button>
+                            <button onClick={() => startEditing(h.ticker)} style={{ padding: "4px 8px", borderRadius: 6, background: "transparent", color: "var(--muted)", border: "1px solid var(--border)", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }} title="Enter price manually">✎</button>
+                          </div>
                         )}
                       </td>
                       <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace" }}>{h.value !== null ? USD(h.value) : "—"}</td>
@@ -1556,6 +1626,8 @@ function MYStocksTab() {
   const [fetchErrors, setFetchErrors] = useState({});
   const [form, setForm] = useState({ code: "", shares: "", avgCost: "", fees: "0", buyDate: "", notes: "" });
   const [refreshedAt, setRefreshedAt] = useState(null);
+  const [editingPrice, setEditingPrice] = useState(new Set());
+  const [manualInput, setManualInput] = useState({});
 
   useEffect(() => {
     try { localStorage.setItem("mystocks_v1", JSON.stringify(holdings)); } catch {}
@@ -1593,6 +1665,19 @@ function MYStocksTab() {
     codes.forEach(fetchPrice);
     setRefreshedAt(Date.now());
   };
+
+  const commitManual = (code) => {
+    const val = parseFloat(manualInput[code]);
+    if (!isNaN(val) && val > 0) {
+      setPrices(p => ({ ...p, [code]: { price: val, prevClose: null, manual: true, at: Date.now() } }));
+      setFetchErrors(e => { const n = { ...e }; delete n[code]; return n; });
+    }
+    setEditingPrice(s => { const n = new Set(s); n.delete(code); return n; });
+    setManualInput(m => { const n = { ...m }; delete n[code]; return n; });
+  };
+
+  const startEditing = (code) => setEditingPrice(s => new Set([...s, code]));
+  const cancelEditing = (code) => setEditingPrice(s => { const n = new Set(s); n.delete(code); return n; });
 
   const addHolding = () => {
     const code = form.code.toUpperCase().trim();
@@ -1768,18 +1853,41 @@ function MYStocksTab() {
                       <td style={{ padding: "12px 14px", textAlign: "right" }}>
                         {isLoading ? (
                           <span style={{ color: "var(--muted)", fontSize: 12 }}>Loading…</span>
+                        ) : editingPrice.has(h.code) ? (
+                          <div style={{ display: "flex", alignItems: "center", gap: 4, justifyContent: "flex-end" }}>
+                            <input
+                              autoFocus type="number" step="0.0001" min="0" placeholder="0.00"
+                              value={manualInput[h.code] || ""}
+                              onChange={e => setManualInput(m => ({ ...m, [h.code]: e.target.value }))}
+                              onKeyDown={e => { if (e.key === "Enter") commitManual(h.code); if (e.key === "Escape") cancelEditing(h.code); }}
+                              style={{ width: 80, padding: "4px 7px", borderRadius: 6, border: `1px solid ${BLUE}`, background: "rgba(56,189,248,0.08)", color: "var(--text)", fontFamily: "'DM Mono', monospace", fontSize: 12, outline: "none" }}
+                            />
+                            <button onClick={() => commitManual(h.code)} style={{ color: BLUE, background: "none", border: "none", cursor: "pointer", fontSize: 15, padding: "2px 3px", lineHeight: 1 }} title="Confirm">✓</button>
+                            <button onClick={() => cancelEditing(h.code)} style={{ color: "var(--muted)", background: "none", border: "none", cursor: "pointer", fontSize: 13, padding: "2px 3px", lineHeight: 1 }} title="Cancel">✕</button>
+                          </div>
                         ) : err ? (
-                          <button onClick={() => fetchPrice(h.code)} style={{ color: "#f87171", background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: 0 }} title={err}>⚠ Retry</button>
+                          <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
+                            <button onClick={() => fetchPrice(h.code)} style={{ color: "#f87171", background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: 0 }} title={err}>⚠ Retry</button>
+                            <button onClick={() => startEditing(h.code)} style={{ color: "var(--muted)", background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: 0 }} title="Enter price manually">✎ Manual</button>
+                          </div>
                         ) : h.pd ? (
                           <div>
-                            <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>{RM2(h.pd.price)}</div>
-                            {h.pd.prevClose != null && (() => {
+                            <div style={{ display: "flex", alignItems: "center", gap: 5, justifyContent: "flex-end" }}>
+                              <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>{RM2(h.pd.price)}</div>
+                              <button onClick={() => startEditing(h.code)} style={{ color: "var(--muted)", background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: 0, opacity: 0.5, lineHeight: 1 }} title="Override price">✎</button>
+                            </div>
+                            {h.pd.manual ? (
+                              <div style={{ fontSize: 10, color: "var(--muted)", fontStyle: "italic" }}>manual</div>
+                            ) : h.pd.prevClose != null && (() => {
                               const chg = ((h.pd.price - h.pd.prevClose) / h.pd.prevClose) * 100;
                               return <div style={{ fontSize: 11, color: chg >= 0 ? "#4ade80" : "#f87171" }}>{chg >= 0 ? "▲" : "▼"} {Math.abs(chg).toFixed(2)}% today</div>;
                             })()}
                           </div>
                         ) : (
-                          <button onClick={() => fetchPrice(h.code)} style={{ padding: "4px 10px", borderRadius: 6, background: "rgba(56,189,248,0.1)", color: BLUE, border: "1px solid rgba(56,189,248,0.2)", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Fetch</button>
+                          <div style={{ display: "flex", gap: 5, justifyContent: "flex-end" }}>
+                            <button onClick={() => fetchPrice(h.code)} style={{ padding: "4px 10px", borderRadius: 6, background: "rgba(56,189,248,0.1)", color: BLUE, border: "1px solid rgba(56,189,248,0.2)", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }}>Fetch</button>
+                            <button onClick={() => startEditing(h.code)} style={{ padding: "4px 8px", borderRadius: 6, background: "transparent", color: "var(--muted)", border: "1px solid var(--border)", cursor: "pointer", fontSize: 11, fontFamily: "inherit" }} title="Enter price manually">✎</button>
+                          </div>
                         )}
                       </td>
                       <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace" }}>{h.value !== null ? RM(h.value) : "—"}</td>
