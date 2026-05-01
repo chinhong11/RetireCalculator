@@ -121,6 +121,11 @@ function projectYears({ salary, age, prYear, annualIncrement, yearsToProject, oa
       saBalance *= (1 + saReturn / 100);
       maBalance *= (1 + maReturn / 100);
 
+      // Advance age/salary first so extra-interest threshold and contributions use the same year's age
+      currentSalary = currentSalary * (1 + annualIncrement / 100);
+      currentAge += 1;
+      currentPRYear += 1;
+
       // Extra CPF interest on combined balances (credited to SA)
       // OA contribution capped at $20,000 towards the threshold
       const oaCapped = Math.min(oaBalance, 20000);
@@ -135,11 +140,6 @@ function projectYears({ salary, age, prYear, annualIncrement, yearsToProject, oa
         extraInterest = Math.min(combined, 60000) * 0.01;
       }
       saBalance += extraInterest;
-
-      // Apply salary increment
-      currentSalary = currentSalary * (1 + annualIncrement / 100);
-      currentAge += 1;
-      currentPRYear += 1;
     }
 
     // Contributions for 12 months
@@ -286,6 +286,9 @@ function projectEpfYears({ wage, age, annualIncrement, years, dividendRate, star
   let w = wage, a = age;
   const r = dividendRate / 100;
   return Array.from({ length: years }, (_, idx) => {
+    // Advance age/wage before computing so year-1 reflects contributions at age+1 (same convention as CPF)
+    a++;
+    w = Math.round(w * (1 + annualIncrement / 100));
     const m = computeEpfMonthly(w, a);
     const yPer = m.persaraan * 12, ySej = m.sejahtera * 12, yFlek = m.fleksibel * 12;
     const divPer = r * (per + yPer * 0.5);
@@ -294,10 +297,7 @@ function projectEpfYears({ wage, age, annualIncrement, years, dividendRate, star
     per = per + yPer + divPer;
     sej = sej + ySej + divSej;
     flek = flek + yFlek + divFlek;
-    const row = { year: idx + 1, age: a, wage: w, monthlyContrib: m.total, per, sej, flek, total: per + sej + flek };
-    w = Math.round(w * (1 + annualIncrement / 100));
-    a++;
-    return row;
+    return { year: idx + 1, age: a, wage: w, monthlyContrib: m.total, per, sej, flek, total: per + sej + flek };
   });
 }
 
@@ -2411,7 +2411,7 @@ function EPFTab() {
 
       {/* Disclaimer */}
       <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7 }}>
-        <strong style={{ color: "var(--label)" }}>Note (EPF Malaysia):</strong> Employee contribution is 11% for members under 60 (55% reduced rate applies above 60). Employer contributes 12% for wages above RM 5,000 or 13% for RM 5,000 and below, dropping to 6% above 60. Post-2024 restructure: contributions split as Persaraan 75% / Sejahtera 15% / Fleksibel 10%. Dividend is projected at a flat rate applied to average balance. For personal planning only — not financial advice.
+        <strong style={{ color: "var(--label)" }}>Note (EPF Malaysia):</strong> Employee contribution is 11% for members under 60 (5.5% reduced rate applies at 60 and above). Employer contributes 12% for wages above RM 5,000 or 13% for RM 5,000 and below, dropping to 6% at 60 and above. Post-2024 restructure: contributions split as Persaraan 75% / Sejahtera 15% / Fleksibel 10%. Dividend is projected at a flat rate applied to average balance. For personal planning only — not financial advice.
       </div>
     </div>
   );
