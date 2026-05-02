@@ -117,6 +117,9 @@ export function projectYears({
   bhs = CPF_BHS_2026,
   frsGrowthRate = 3.5,
   bhsGrowthRate = 3.5,
+  // SA Shielding: invest this amount of SA into CPFIS-SA before 55 to protect
+  // it from the RA transfer. At 55 the CPFIS-SA proceeds return to OA.
+  saShield = 0,
 }) {
   const data = [];
 
@@ -127,6 +130,13 @@ export function projectYears({
   let raBalance = raFormed ? saStart : 0;
   // Cap initial MA at today's BHS (any excess overflowed in the past already).
   let maBalance = Math.min(maStart, bhs);
+
+  // CPFIS-SA shield: carved out of saBalance, grows at SA rate, returns to OA at 55.
+  let cpfisBalance = 0;
+  if (!raFormed && saShield > 0) {
+    cpfisBalance = Math.min(saShield, saBalance);
+    saBalance   -= cpfisBalance;
+  }
 
   let currentSalary  = salary;
   let currentAge     = age;
@@ -141,6 +151,7 @@ export function projectYears({
       oaBalance *= (1 + oaReturn / 100);
       if (raFormed) raBalance *= (1 + saReturn / 100);
       else          saBalance *= (1 + saReturn / 100);
+      if (cpfisBalance > 0) cpfisBalance *= (1 + saReturn / 100);
       maBalance *= (1 + maReturn / 100);
 
       // MA interest overflow → SA/RA
@@ -155,15 +166,18 @@ export function projectYears({
       currentAge    += 1;
       currentPRYear += 1;
 
-      // 3. RA formation at 55: SA fully transferred, OA tops up to inflation-adjusted FRS
+      // 3. RA formation at 55: only uninvested SA transferred; CPFIS-SA liquidated → OA
       if (!raFormed && currentAge >= 55) {
         raFormed  = true;
-        raBalance = saBalance;
+        raBalance = saBalance;   // only the uninvested (non-shielded) SA
         saBalance = 0;
         const effectiveFrs = Math.round(frs * Math.pow(1 + frsGrowthRate / 100, y));
         const topUp = Math.min(oaBalance, Math.max(0, effectiveFrs - raBalance));
         raBalance  += topUp;
         oaBalance  -= topUp;
+        // Liquidate CPFIS-SA → OA (user sells investments, proceeds credited to OA)
+        oaBalance    += cpfisBalance;
+        cpfisBalance  = 0;
       }
 
       // 4. Extra CPF interest (OA capped at $20k towards combined threshold)
@@ -201,11 +215,12 @@ export function projectYears({
       age: currentAge, prYear: currentPRYear,
       salary: Math.round(currentSalary),
       oa: Math.round(oaBalance),
-      sa: Math.round(saBalance),   // 0 once raFormed
-      ra: Math.round(raBalance),   // 0 before raFormed
+      sa: Math.round(saBalance),        // 0 once raFormed
+      ra: Math.round(raBalance),        // 0 before raFormed
       ma: Math.round(maBalance),
+      cpfis: Math.round(cpfisBalance),  // 0 after age 55 (liquidated)
       bhs: currentBhs,
-      total: Math.round(oaBalance + saBalance + raBalance + maBalance),
+      total: Math.round(oaBalance + saBalance + raBalance + maBalance + cpfisBalance),
       raFormed,
       monthlyContrib: monthly.totalContrib,
       annualContrib:  monthly.totalContrib * 12,

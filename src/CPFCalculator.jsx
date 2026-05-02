@@ -1,7 +1,8 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useCallback } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
 import { OW_CEILING, CPF_FRS_2026, CPF_BHS_2026, computeMonthly, projectYears, estimateCpfLifePayout, fmt, fmtD } from "./lib/cpf.js";
+import { exportCpfPdf } from "./lib/exportPdf.js";
 
 import { SliderInput }    from "./components/shared/SliderInput.jsx";
 import { StatCard }       from "./components/shared/StatCard.jsx";
@@ -20,7 +21,61 @@ import FireTab           from "./components/tabs/FireTab.jsx";
 import NetWorthTab       from "./components/tabs/NetWorthTab.jsx";
 import SummaryTab        from "./components/tabs/SummaryTab.jsx";
 
+const THEMES = {
+  dark: {
+    "--bg": "#0a0e17",
+    "--card-bg": "rgba(255,255,255,0.03)",
+    "--border": "rgba(255,255,255,0.08)",
+    "--text": "#e8eaf0",
+    "--label": "#a0a8c0",
+    "--muted": "#5a6380",
+    "--accent": "#6ee7b7",
+    "--accent2": "#818cf8",
+    "--track": "rgba(255,255,255,0.06)",
+    "--tooltip-bg": "rgba(15,20,35,0.92)",
+    "--input-bg": "rgba(255,255,255,0.04)",
+    "--hover-bg": "rgba(255,255,255,0.04)",
+    "--option-bg": "#0a0e17",
+    "--option-color": "#e8eaf0",
+    "--accent-subtle": "rgba(110,231,183,0.1)",
+    "--accent-border-c": "rgba(110,231,183,0.2)",
+    "--accent-chip": "rgba(110,231,183,0.12)",
+    "--accent-shadow": "rgba(110,231,183,0.15)",
+    "--row-alt": "rgba(255,255,255,0.01)",
+    "--header-tint": "rgba(110,231,183,0.06)",
+    "--grid-line": "rgba(255,255,255,0.04)",
+  },
+  light: {
+    "--bg": "#f0f4f8",
+    "--card-bg": "#ffffff",
+    "--border": "rgba(0,0,0,0.09)",
+    "--text": "#111827",
+    "--label": "#374151",
+    "--muted": "#6b7280",
+    "--accent": "#059669",
+    "--accent2": "#4f46e5",
+    "--track": "rgba(0,0,0,0.1)",
+    "--tooltip-bg": "rgba(255,255,255,0.97)",
+    "--input-bg": "rgba(0,0,0,0.03)",
+    "--hover-bg": "rgba(0,0,0,0.04)",
+    "--option-bg": "#ffffff",
+    "--option-color": "#111827",
+    "--accent-subtle": "rgba(5,150,105,0.08)",
+    "--accent-border-c": "rgba(5,150,105,0.2)",
+    "--accent-chip": "rgba(5,150,105,0.1)",
+    "--accent-shadow": "rgba(5,150,105,0.15)",
+    "--row-alt": "rgba(0,0,0,0.015)",
+    "--header-tint": "rgba(5,150,105,0.04)",
+    "--grid-line": "rgba(0,0,0,0.06)",
+  },
+};
+
 export default function CPFCalculator() {
+  const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "dark");
+  useEffect(() => { localStorage.setItem("theme", theme); }, [theme]);
+  const isDark = theme === "dark";
+  const tv = THEMES[theme]; // theme variable values for use in JSX
+
   const [salary, setSalary]               = useState(5000);
   const [age, setAge]                     = useState(30);
   const [prYear, setPrYear]               = useState(1);
@@ -33,59 +88,66 @@ export default function CPFCalculator() {
   const [saStart, setSaStart] = useState(() => { try { return parseFloat(localStorage.getItem("cpf_sa_start") || "0") || 0; } catch { return 0; } });
   const [maStart, setMaStart] = useState(() => { try { return parseFloat(localStorage.getItem("cpf_ma_start") || "0") || 0; } catch { return 0; } });
   const [ceilingGrowth, setCeilingGrowth] = useState(() => { try { return parseFloat(localStorage.getItem("cpf_ceiling_growth") || "3.5") || 3.5; } catch { return 3.5; } });
+  const [saShield, setSaShield]   = useState(() => { try { return parseFloat(localStorage.getItem("cpf_sa_shield") || "0") || 0; } catch { return 0; } });
+  const [saShieldOn, setSaShieldOn] = useState(() => !!parseFloat(localStorage.getItem("cpf_sa_shield") || "0"));
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem("active_tab") || "summary");
+  const [pdfBusy, setPdfBusy] = useState(false);
   useEffect(() => { try { localStorage.setItem("active_tab", activeTab); } catch {} }, [activeTab]);
 
   useEffect(() => { try { localStorage.setItem("cpf_oa_start",       oaStart);       } catch {} }, [oaStart]);
   useEffect(() => { try { localStorage.setItem("cpf_sa_start",       saStart);       } catch {} }, [saStart]);
   useEffect(() => { try { localStorage.setItem("cpf_ma_start",       maStart);       } catch {} }, [maStart]);
   useEffect(() => { try { localStorage.setItem("cpf_ceiling_growth", ceilingGrowth); } catch {} }, [ceilingGrowth]);
+  useEffect(() => { try { localStorage.setItem("cpf_sa_shield", saShieldOn ? saShield : 0); } catch {} }, [saShield, saShieldOn]);
+
+  const effectiveSaShield = (!age || age >= 55 || !saShieldOn) ? 0 : saShield;
 
   const monthly = useMemo(() => computeMonthly(salary, age, prYear), [salary, age, prYear]);
   const projectionData = useMemo(() => projectYears({
     salary, age, prYear, annualIncrement, yearsToProject, oaReturn, saReturn, maReturn, oaStart, saStart, maStart,
-    frsGrowthRate: ceilingGrowth, bhsGrowthRate: ceilingGrowth,
-  }), [salary, age, prYear, annualIncrement, yearsToProject, oaReturn, saReturn, maReturn, oaStart, saStart, maStart, ceilingGrowth]);
+    frsGrowthRate: ceilingGrowth, bhsGrowthRate: ceilingGrowth, saShield: effectiveSaShield,
+  }), [salary, age, prYear, annualIncrement, yearsToProject, oaReturn, saReturn, maReturn, oaStart, saStart, maStart, ceilingGrowth, effectiveSaShield]);
 
   const finalData      = projectionData[projectionData.length - 1];
   const cpfLifePayout  = useMemo(() => estimateCpfLifePayout(projectionData, saReturn), [projectionData, saReturn]);
 
+  const handleExportPdf = useCallback(async () => {
+    if (pdfBusy) return;
+    setPdfBusy(true);
+    try {
+      await exportCpfPdf({ projectionData, salary, age, prYear, annualIncrement, yearsToProject, oaReturn, saReturn, maReturn, ceilingGrowth, saShield: effectiveSaShield, cpfLifePayout });
+    } finally {
+      setPdfBusy(false);
+    }
+  }, [projectionData, salary, age, prYear, annualIncrement, yearsToProject, oaReturn, saReturn, maReturn, ceilingGrowth, effectiveSaShield, cpfLifePayout, pdfBusy]);
+
   return (
     <div style={{
-      "--bg": "#0a0e17",
-      "--card-bg": "rgba(255,255,255,0.03)",
-      "--border": "rgba(255,255,255,0.08)",
-      "--text": "#e8eaf0",
-      "--label": "#a0a8c0",
-      "--muted": "#5a6380",
-      "--accent": "#6ee7b7",
-      "--accent2": "#818cf8",
-      "--track": "rgba(255,255,255,0.06)",
-      "--tooltip-bg": "rgba(15,20,35,0.92)",
+      ...tv,
       fontFamily: "'Instrument Sans', 'SF Pro Display', system-ui, sans-serif",
       background: "var(--bg)",
       color: "var(--text)",
       minHeight: "100vh",
       padding: "0 0 40px 0",
+      transition: "background 0.2s, color 0.2s",
     }}>
       <style>{`
         @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
         input[type=range] { -webkit-appearance: none; height: 6px; border-radius: 4px; background: var(--track); outline: none; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg); box-shadow: 0 0 10px rgba(110,231,183,0.3); }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg); box-shadow: 0 0 10px var(--accent-shadow); }
         input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg); }
         .tab-btn { padding: 10px 20px; border-radius: 10px; border: 1px solid transparent; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: inherit; }
-        .tab-btn:hover { color: var(--text); background: rgba(255,255,255,0.04); }
-        .tab-btn.active { background: rgba(110,231,183,0.1); color: var(--accent); border-color: rgba(110,231,183,0.2); }
-        .recharts-cartesian-grid-horizontal line, .recharts-cartesian-grid-vertical line { stroke: rgba(255,255,255,0.04); }
-        .input-field { width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: rgba(255,255,255,0.04); color: var(--text); font-size: 15px; font-family: 'DM Mono', monospace; font-weight: 500; outline: none; transition: border 0.2s; }
-        .input-field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(110,231,183,0.1); }
+        .tab-btn:hover { color: var(--text); background: var(--hover-bg); }
+        .tab-btn.active { background: var(--accent-subtle); color: var(--accent); border-color: var(--accent-border-c); }
+        .input-field { width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font-size: 15px; font-family: 'DM Mono', monospace; font-weight: 500; outline: none; transition: border 0.2s; }
+        .input-field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-shadow); }
         .pr-chip { display: inline-flex; align-items: center; padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; border: 1px solid var(--border); background: transparent; color: var(--muted); font-family: inherit; }
-        .pr-chip.selected { background: rgba(110,231,183,0.12); color: var(--accent); border-color: rgba(110,231,183,0.25); }
+        .pr-chip.selected { background: var(--accent-chip); color: var(--accent); border-color: var(--accent-border-c); }
         .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 600; margin-bottom: 16px; }
-        .hl-in { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.04); color: var(--text); font-size: 13px; font-family: inherit; outline: none; transition: border 0.2s; -webkit-appearance: none; appearance: none; }
-        .hl-in:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(110,231,183,0.12); }
-        .hl-in option { background: #0a0e17; color: #e8eaf0; }
+        .hl-in { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font-size: 13px; font-family: inherit; outline: none; transition: border 0.2s; -webkit-appearance: none; appearance: none; }
+        .hl-in:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-shadow); }
+        .hl-in option { background: var(--option-bg); color: var(--option-color); }
         @media (max-width: 480px) {
           .tab-btn { padding: 7px 12px; font-size: 12px; }
           .mobile-h1 { font-size: 22px !important; }
@@ -97,14 +159,33 @@ export default function CPFCalculator() {
       {/* Header */}
       <div className="mobile-pad" style={{
         padding: "32px 24px 24px",
-        background: "linear-gradient(180deg, rgba(110,231,183,0.06) 0%, transparent 100%)",
+        background: `linear-gradient(180deg, ${tv["--header-tint"]} 0%, transparent 100%)`,
         borderBottom: "1px solid var(--border)",
         marginBottom: 24,
       }}>
         <div style={{ maxWidth: 800, margin: "0 auto" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-            <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)", boxShadow: "0 0 12px rgba(110,231,183,0.5)" }} />
-            <span style={{ fontSize: 12, fontWeight: 600, color: "var(--accent)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Singapore 2026</span>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
+              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)" }} />
+              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--accent)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Singapore 2026</span>
+            </div>
+            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+              {/* Theme toggle */}
+              <button
+                onClick={() => setTheme(t => t === "dark" ? "light" : "dark")}
+                title={isDark ? "Switch to light mode" : "Switch to dark mode"}
+                style={{ background: "var(--input-bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontSize: 15, lineHeight: 1, color: "var(--text)" }}
+              >{isDark ? "☀️" : "🌙"}</button>
+              {/* PDF export */}
+              <button
+                onClick={handleExportPdf}
+                disabled={pdfBusy}
+                title="Export projection as PDF"
+                style={{ background: "var(--input-bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 12px", cursor: pdfBusy ? "default" : "pointer", fontSize: 12, fontWeight: 600, color: pdfBusy ? "var(--muted)" : "var(--accent)", opacity: pdfBusy ? 0.6 : 1, display: "flex", alignItems: "center", gap: 5 }}
+              >
+                {pdfBusy ? "⏳ Generating…" : "⬇ PDF"}
+              </button>
+            </div>
           </div>
           <h1 className="mobile-h1" style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
             CPF Contribution<br />Calculator
@@ -192,6 +273,44 @@ export default function CPFCalculator() {
                   Starting balance: {fmtD(oaStart + saStart + maStart)}
                 </div>
               )}
+
+              {/* SA Shielding */}
+              {age < 55 && (
+                <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: saShieldOn ? 10 : 0 }}>
+                    <input type="checkbox" checked={saShieldOn} onChange={e => setSaShieldOn(e.target.checked)}
+                      style={{ width: 15, height: 15, accentColor: "var(--accent)", cursor: "pointer" }} />
+                    <span style={{ fontSize: 13, color: "var(--label)", fontWeight: 600 }}>SA Shielding (CPFIS-SA)</span>
+                  </label>
+                  {saShieldOn && (
+                    <>
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 8, lineHeight: 1.6 }}>
+                        Invest this amount of SA into CPFIS before age 55. Only uninvested SA cash forms RA — the
+                        shield stays in CPFIS (growing at SA rate) and returns to your OA after 55, preserving
+                        more flexible funds.
+                      </div>
+                      <input
+                        type="number" min="0" max={saStart} placeholder="e.g. 40000" value={saShield || ""}
+                        onChange={e => setSaShield(Math.max(0, parseFloat(e.target.value) || 0))}
+                        style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid rgba(129,140,248,0.3)", background: "rgba(129,140,248,0.06)", color: "var(--text)", fontSize: 14, fontFamily: "'DM Mono', monospace", outline: "none" }}
+                      />
+                      {saShield > 0 && saStart > 0 && saShield > saStart && (
+                        <div style={{ fontSize: 11, color: "#fbbf24", marginTop: 4 }}>
+                          ⚠ Shield exceeds SA balance — capped at {fmtD(saStart)}
+                        </div>
+                      )}
+                      {saShield > 0 && (() => {
+                        const raRow = projectionData.find(d => d.raFormed);
+                        return raRow ? (
+                          <div style={{ fontSize: 11, color: "#818cf8", marginTop: 6, lineHeight: 1.6 }}>
+                            At age 55: RA = {fmtD(raRow.ra)} · OA = {fmtD(raRow.oa)} (includes CPFIS proceeds)
+                          </div>
+                        ) : null;
+                      })()}
+                    </>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -214,7 +333,7 @@ export default function CPFCalculator() {
           <AccountBar label="MediSave Account (MA)" amount={monthly.maAmount}  total={monthly.totalContrib} color="#f472b6" />
           <div style={{
             marginTop: 16, padding: "12px 16px", borderRadius: 10,
-            background: "rgba(110,231,183,0.05)", border: "1px solid rgba(110,231,183,0.1)",
+            background: "var(--accent-subtle)", border: "1px solid var(--accent-border-c)",
             fontSize: 12, color: "var(--label)", lineHeight: 1.6,
           }}>
             {prYear === 1 && "💡 As a 1st-year PR, your combined CPF rate is 9% — much lower than the full 37%. Rates increase in Year 2 (24%) and reach full citizen rates from Year 3 onwards."}
@@ -290,7 +409,7 @@ export default function CPFCalculator() {
                     <stop offset="100%" stopColor="#f472b6" stopOpacity={0.02} />
                   </linearGradient>
                 </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
+                <CartesianGrid strokeDasharray="3 3" stroke={tv["--grid-line"]} />
                 <XAxis dataKey="year" tick={{ fill: "#5a6380", fontSize: 12 }} axisLine={false} tickLine={false} />
                 <YAxis
                   tick={{ fill: "#5a6380", fontSize: 11 }} axisLine={false} tickLine={false}
@@ -341,7 +460,7 @@ export default function CPFCalculator() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                    {["Year", "Age", "PR Yr", "Salary", "Monthly", "OA", "SA", "RA", "MA", "Total CPF"].map(h => (
+                    {["Year", "Age", "PR Yr", "Salary", "Monthly", "OA", "SA", "RA", "MA", ...(effectiveSaShield > 0 ? ["CPFIS-SA"] : []), "Total CPF"].map(h => (
                       <th key={h} style={{
                         padding: "14px 12px", textAlign: "right", fontSize: 11, fontWeight: 600,
                         color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em",
@@ -354,7 +473,7 @@ export default function CPFCalculator() {
                   {projectionData.map((d, i) => {
                     const isRaYear = d.raFormed && (i === 0 ? true : !projectionData[i - 1].raFormed);
                     return (
-                      <tr key={i} style={{ borderBottom: "1px solid var(--border)", background: isRaYear ? "rgba(167,139,250,0.06)" : i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)" }}>
+                      <tr key={i} style={{ borderBottom: "1px solid var(--border)", background: isRaYear ? "rgba(167,139,250,0.06)" : i % 2 === 0 ? "transparent" : tv["--row-alt"] }}>
                         <td style={{ padding: "12px", textAlign: "right", fontWeight: 600 }}>
                           {d.year}
                           {isRaYear && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: "#a78bfa", background: "rgba(167,139,250,0.15)", padding: "2px 5px", borderRadius: 4, verticalAlign: "middle" }}>RA</span>}
@@ -367,6 +486,9 @@ export default function CPFCalculator() {
                         <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: "#818cf8" }}>{d.raFormed ? <span style={{ color: "var(--muted)" }}>—</span> : fmtD(d.sa)}</td>
                         <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: "#a78bfa" }}>{d.raFormed ? fmtD(d.ra) : <span style={{ color: "var(--muted)" }}>—</span>}</td>
                         <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: "#f472b6" }}>{fmtD(d.ma)}</td>
+                        {effectiveSaShield > 0 && (
+                          <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: "#818cf8" }}>{d.cpfis > 0 ? fmtD(d.cpfis) : <span style={{ color: "var(--muted)" }}>—</span>}</td>
+                        )}
                         <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 700, color: "var(--accent)" }}>{fmtD(d.total)}</td>
                       </tr>
                     );

@@ -668,3 +668,75 @@ describe("runMigrations", () => {
     expect(() => runMigrations()).not.toThrow();
   });
 });
+
+// ─── SA Shielding ─────────────────────────────────────────────────────────────
+
+describe("SA Shielding (CPFIS-SA)", () => {
+  const base = {
+    salary: 6000, age: 50, prYear: 3,
+    annualIncrement: 0, yearsToProject: 10,
+    oaReturn: 2.5, saReturn: 4, maReturn: 4,
+    oaStart: 50000, saStart: 80000, maStart: 10000,
+    frsGrowthRate: 0, bhsGrowthRate: 0,
+  };
+
+  it("without shielding: cpfis is 0 for all rows", () => {
+    const rows = projectYears(base);
+    expect(rows.every(r => r.cpfis === 0)).toBe(true);
+  });
+
+  it("with shielding: cpfis starts at min(saShield, saStart)", () => {
+    const rows = projectYears({ ...base, saShield: 30000 });
+    expect(rows[0].cpfis).toBe(30000);
+  });
+
+  it("shield is capped at saStart if saShield > saStart", () => {
+    const rows = projectYears({ ...base, saShield: 999999 });
+    expect(rows[0].cpfis).toBe(base.saStart);
+  });
+
+  it("with shielding: saBalance at year 0 is saStart minus shield", () => {
+    const rows = projectYears({ ...base, saShield: 30000 });
+    expect(rows[0].sa).toBe(base.saStart - 30000);
+  });
+
+  it("cpfis grows at saReturn rate each year before RA formation", () => {
+    const rows = projectYears({ ...base, saShield: 30000 });
+    expect(rows[1].cpfis).toBeCloseTo(30000 * 1.04, 0);
+  });
+
+  it("cpfis becomes 0 after RA formation (liquidated to OA)", () => {
+    const rows = projectYears({ ...base, saShield: 30000 });
+    const afterRa = rows.filter(r => r.raFormed);
+    expect(afterRa.every(r => r.cpfis === 0)).toBe(true);
+  });
+
+  it("OA at RA formation is higher with shielding than without", () => {
+    const withShield    = projectYears({ ...base, saShield: 30000 });
+    const withoutShield = projectYears(base);
+    const shieldRaRow   = withShield.find(r => r.raFormed);
+    const noShieldRaRow = withoutShield.find(r => r.raFormed);
+    expect(shieldRaRow.oa).toBeGreaterThan(noShieldRaRow.oa);
+  });
+
+  it("RA at formation is lower with shielding (less SA was available to transfer)", () => {
+    const withShield    = projectYears({ ...base, saShield: 30000 });
+    const withoutShield = projectYears(base);
+    const shieldRaRow   = withShield.find(r => r.raFormed);
+    const noShieldRaRow = withoutShield.find(r => r.raFormed);
+    expect(shieldRaRow.ra).toBeLessThan(noShieldRaRow.ra);
+  });
+
+  it("total at year 0 includes cpfis", () => {
+    const rows = projectYears({ ...base, saShield: 30000 });
+    expect(rows[0].total).toBe(rows[0].oa + rows[0].sa + rows[0].ra + rows[0].ma + rows[0].cpfis);
+  });
+
+  it("total is continuous — shield returning to OA does not lose value", () => {
+    const rows = projectYears({ ...base, saShield: 30000 });
+    rows.forEach((r, i) => {
+      if (i === 0) return;
+      expect(r.total).toBeGreaterThan(rows[i - 1].total);
+    });
+  });
+});
