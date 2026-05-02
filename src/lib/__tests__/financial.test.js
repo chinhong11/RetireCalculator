@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import {
   getRateKey, getAllocationKey, getSPRKey,
@@ -12,6 +12,7 @@ import {
 } from "../epf.js";
 
 import { calcInstallment, calcFd } from "../finance.js";
+import { runMigrations, SCHEMA_KEY, CURRENT_VERSION } from "../migrations.js";
 
 // ─── CPF rate-table lookups ───────────────────────────────────────────────────
 
@@ -332,5 +333,111 @@ describe("FIRE number formula", () => {
 
   it("higher withdrawal rate produces a lower FIRE number", () => {
     expect(fireNumber(3000, 5)).toBeLessThan(fireNumber(3000, 4));
+  });
+});
+
+// ─── migrations ───────────────────────────────────────────────────────────────
+
+// Minimal localStorage stub for Node environment (vitest runs in Node)
+const store = {};
+const localStorageStub = {
+  getItem:    k => (k in store ? store[k] : null),
+  setItem:    (k, v) => { store[k] = String(v); },
+  removeItem: k => { delete store[k]; },
+  clear:      ()    => { Object.keys(store).forEach(k => delete store[k]); },
+};
+
+beforeEach(() => {
+  localStorageStub.clear();
+  global.localStorage = localStorageStub;
+});
+
+afterEach(() => {
+  delete global.localStorage;
+});
+
+describe("runMigrations", () => {
+  it("sets _schema_version to CURRENT_VERSION on a fresh store", () => {
+    runMigrations();
+    expect(localStorage.getItem(SCHEMA_KEY)).toBe(String(CURRENT_VERSION));
+  });
+
+  it("is idempotent — running twice does not corrupt data", () => {
+    localStorage.setItem("stocks_v1", JSON.stringify([{ ticker: "AAPL", shares: 10, avgCost: 150 }]));
+    runMigrations();
+    runMigrations();
+    const rows = JSON.parse(localStorage.getItem("stocks_v1"));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].ticker).toBe("AAPL");
+  });
+
+  it("skips migration when version is already current", () => {
+    localStorage.setItem(SCHEMA_KEY, String(CURRENT_VERSION));
+    // Corrupt the stocks store — migration must NOT run and overwrite it
+    localStorage.setItem("stocks_v1", "NOT_JSON");
+    runMigrations();
+    expect(localStorage.getItem("stocks_v1")).toBe("NOT_JSON");
+  });
+
+  it("v0→v1: backfills missing id onto stocks_v1 records", () => {
+    localStorage.setItem("stocks_v1", JSON.stringify([
+      { ticker: "AAPL", shares: 10, avgCost: 150 },
+    ]));
+    runMigrations();
+    const rows = JSON.parse(localStorage.getItem("stocks_v1"));
+    expect(rows[0]).toHaveProperty("id");
+    expect(typeof rows[0].id).toBe("string");
+    expect(rows[0].id.length).toBeGreaterThan(0);
+  });
+
+  it("v0→v1: backfills totalFees and notes onto stocks_v1 records", () => {
+    localStorage.setItem("stocks_v1", JSON.stringify([
+      { ticker: "AAPL", shares: 10, avgCost: 150 },
+    ]));
+    runMigrations();
+    const rows = JSON.parse(localStorage.getItem("stocks_v1"));
+    expect(rows[0].totalFees).toBe(0);
+    expect(rows[0].notes).toBe("");
+  });
+
+  it("v0→v1: preserves existing field values — does not overwrite non-missing fields", () => {
+    localStorage.setItem("stocks_v1", JSON.stringify([
+      { id: "abc123", ticker: "TSLA", shares: 5, avgCost: 200, totalFees: 9.99, notes: "existing" },
+    ]));
+    runMigrations();
+    const rows = JSON.parse(localStorage.getItem("stocks_v1"));
+    expect(rows[0].id).toBe("abc123");
+    expect(rows[0].totalFees).toBe(9.99);
+    expect(rows[0].notes).toBe("existing");
+  });
+
+  it("v0→v1: backfills notes onto fd_v1 records", () => {
+    localStorage.setItem("fd_v1", JSON.stringify([
+      { bank: "Maybank", principal: 50000, rate: 3.85, tenureMonths: 12 },
+    ]));
+    runMigrations();
+    const rows = JSON.parse(localStorage.getItem("fd_v1"));
+    expect(rows[0].notes).toBe("");
+  });
+
+  it("v0→v1: backfills downpaymentRecords and progressiveRecords onto hl_props_v1", () => {
+    localStorage.setItem("hl_props_v1", JSON.stringify([
+      { name: "Test Condo", purchasePrice: 500000, interestRate: 4, tenure: 35 },
+    ]));
+    runMigrations();
+    const rows = JSON.parse(localStorage.getItem("hl_props_v1"));
+    expect(Array.isArray(rows[0].downpaymentRecords)).toBe(true);
+    expect(Array.isArray(rows[0].progressiveRecords)).toBe(true);
+  });
+
+  it("v0→v1: leaves empty collections intact", () => {
+    localStorage.setItem("stocks_v1", JSON.stringify([]));
+    runMigrations();
+    const rows = JSON.parse(localStorage.getItem("stocks_v1"));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("v0→v1: handles missing collections gracefully (no error)", () => {
+    expect(() => runMigrations()).not.toThrow();
   });
 });
