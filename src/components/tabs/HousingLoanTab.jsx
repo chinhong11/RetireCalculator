@@ -397,9 +397,9 @@ export default function HousingLoanTab() {
       <div style={{ background: "var(--card-bg)", borderRadius: 16, padding: 24, border: "1px solid var(--border)", marginBottom: 20 }}>
         <div className="section-title">Downpayment Records</div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16, alignItems: "flex-end" }}>
-          <div style={{ flex: "0 0 auto" }}>
+          <div style={{ flex: "1 1 130px" }}>
             <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Date</label>
-            <input className="hl-in" type="date" style={{ width: 160 }} value={dpForm.date} onChange={e => setDpForm(f => ({ ...f, date: e.target.value }))} />
+            <input className="hl-in" type="date" value={dpForm.date} onChange={e => setDpForm(f => ({ ...f, date: e.target.value }))} />
           </div>
           <div style={{ flex: "1 1 140px" }}>
             <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Amount (RM)</label>
@@ -463,9 +463,9 @@ export default function HousingLoanTab() {
             💡 For under-construction properties, the bank disburses funds to the developer stage by stage. You pay interest-only on the cumulative amount released. Add a record for each progress claim to track your monthly interest payments before VP (Vacant Possession).
           </div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 16, alignItems: "flex-end" }}>
-            <div style={{ flex: "0 0 auto" }}>
+            <div style={{ flex: "1 1 130px" }}>
               <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Month</label>
-              <input className="hl-in" type="month" style={{ width: 160 }} value={prForm.month} onChange={e => setPrForm(f => ({ ...f, month: e.target.value }))} />
+              <input className="hl-in" type="month" value={prForm.month} onChange={e => setPrForm(f => ({ ...f, month: e.target.value }))} />
             </div>
             <div style={{ flex: "1 1 140px" }}>
               <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Claim Amount (RM)</label>

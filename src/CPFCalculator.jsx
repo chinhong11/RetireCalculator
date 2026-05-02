@@ -82,10 +82,16 @@ export default function CPFCalculator() {
         .hl-in { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: rgba(255,255,255,0.04); color: var(--text); font-size: 13px; font-family: inherit; outline: none; transition: border 0.2s; -webkit-appearance: none; appearance: none; }
         .hl-in:focus { border-color: var(--accent); box-shadow: 0 0 0 2px rgba(110,231,183,0.12); }
         .hl-in option { background: #0a0e17; color: #e8eaf0; }
+        @media (max-width: 480px) {
+          .tab-btn { padding: 7px 12px; font-size: 12px; }
+          .mobile-h1 { font-size: 22px !important; }
+          .mobile-pad { padding: 20px 16px 16px !important; }
+          .mobile-inner { padding: 0 12px !important; }
+        }
       `}</style>
 
       {/* Header */}
-      <div style={{
+      <div className="mobile-pad" style={{
         padding: "32px 24px 24px",
         background: "linear-gradient(180deg, rgba(110,231,183,0.06) 0%, transparent 100%)",
         borderBottom: "1px solid var(--border)",
@@ -96,7 +102,7 @@ export default function CPFCalculator() {
             <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)", boxShadow: "0 0 12px rgba(110,231,183,0.5)" }} />
             <span style={{ fontSize: 12, fontWeight: 600, color: "var(--accent)", letterSpacing: "0.08em", textTransform: "uppercase" }}>Singapore 2026</span>
           </div>
-          <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
+          <h1 className="mobile-h1" style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
             CPF Contribution<br />Calculator
           </h1>
           <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 8, lineHeight: 1.5 }}>
@@ -109,7 +115,7 @@ export default function CPFCalculator() {
         </div>
       </div>
 
-      <div style={{ maxWidth: 800, margin: "0 auto", padding: "0 20px" }}>
+      <div className="mobile-inner" style={{ maxWidth: 800, margin: "0 auto", padding: "0 20px" }}>
         {/* Input Section */}
         <div style={{
           display: "grid",

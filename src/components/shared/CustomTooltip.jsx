@@ -15,7 +15,7 @@ export const CustomTooltip = ({ active, payload, label }) => {
       fontSize: 13,
       color: "var(--text)",
       boxShadow: "0 8px 32px rgba(0,0,0,0.2)",
-      minWidth: 200,
+      minWidth: "min(200px, calc(100vw - 32px))",
     }}>
       <div style={{ fontWeight: 700, marginBottom: 8, fontSize: 14 }}>Year {d.year} <span style={{ color: "var(--muted)", fontWeight: 400 }}>(Age {d.age})</span></div>
       <div style={{ display: "grid", gridTemplateColumns: "1fr auto", gap: "4px 16px" }}>

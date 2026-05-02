@@ -188,9 +188,9 @@ export default function StocksTab() {
               onChange={e => setForm(f => ({ ...f, fees: e.target.value }))} min={0} step={0.01}
               style={{ fontFamily: "'DM Mono', monospace" }} />
           </div>
-          <div style={{ flex: "0 0 auto" }}>
+          <div style={{ flex: "1 1 130px" }}>
             <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Buy Date</label>
-            <input className="hl-in" type="date" style={{ width: 155 }} value={form.buyDate}
+            <input className="hl-in" type="date" value={form.buyDate}
               onChange={e => setForm(f => ({ ...f, buyDate: e.target.value }))} />
           </div>
           <div style={{ flex: "2 1 160px" }}>
