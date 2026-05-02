@@ -1,10 +1,11 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 
 import {
   getRateKey, getAllocationKey, getSPRKey,
   getContribRates, getAllocation,
   computeMonthly, projectYears,
-  OW_CEILING,
+  OW_CEILING, CPF_FRS_2026, CPF_BHS_2026, CPF_LIFE_RATE,
+  estimateCpfLifePayout,
 } from "../cpf.js";
 
 import {
@@ -12,6 +13,7 @@ import {
 } from "../epf.js";
 
 import { calcInstallment, calcFd } from "../finance.js";
+import { runMigrations, SCHEMA_KEY, CURRENT_VERSION } from "../migrations.js";
 
 // ─── CPF rate-table lookups ───────────────────────────────────────────────────
 
@@ -160,9 +162,9 @@ describe("projectYears", () => {
     expect(rows[1].total).toBeGreaterThanOrEqual(m.totalContrib * 12);
   });
 
-  it("OA+SA+MA equals total for every row (within 2 due to per-account rounding)", () => {
+  it("OA+SA+RA+MA equals total for every row (within 2 due to per-account rounding)", () => {
     const rows = projectYears({ ...base, yearsToProject: 5 });
-    rows.forEach(r => expect(Math.abs(r.oa + r.sa + r.ma - r.total)).toBeLessThanOrEqual(2));
+    rows.forEach(r => expect(Math.abs(r.oa + r.sa + r.ra + r.ma - r.total)).toBeLessThanOrEqual(2));
   });
 
   it("age increments by 1 each year", () => {
@@ -175,6 +177,82 @@ describe("projectYears", () => {
   it("balances grow even with 0% return (contributions-only growth)", () => {
     const rows = projectYears({ ...base, oaReturn: 0, saReturn: 0, maReturn: 0, yearsToProject: 3 });
     expect(rows[3].total).toBeGreaterThan(rows[2].total);
+  });
+});
+
+// ─── RA formation at 55 ───────────────────────────────────────────────────────
+
+describe("RA formation at age 55", () => {
+  // Start at 54, project 2 years so age goes 54 → 55 → 56
+  const base55 = {
+    salary: 6000, age: 54, prYear: 3, annualIncrement: 0, yearsToProject: 2,
+    oaReturn: 2.5, saReturn: 4, maReturn: 4,
+    oaStart: 300_000, saStart: 100_000, maStart: 50_000,
+    frs: CPF_FRS_2026,
+  };
+
+  it("raFormed is false at age 54, true at age 55", () => {
+    const rows = projectYears(base55);
+    expect(rows[0].raFormed).toBe(false); // age 54
+    expect(rows[1].raFormed).toBe(true);  // age 55
+    expect(rows[2].raFormed).toBe(true);  // age 56
+  });
+
+  it("SA becomes 0 when RA is formed", () => {
+    const rows = projectYears(base55);
+    expect(rows[0].sa).toBeGreaterThan(0); // SA exists before 55
+    expect(rows[1].sa).toBe(0);            // SA = 0 at 55
+    expect(rows[2].sa).toBe(0);            // SA stays 0 after 55
+  });
+
+  it("RA is 0 before formation, non-zero after", () => {
+    const rows = projectYears(base55);
+    expect(rows[0].ra).toBe(0);           // no RA before 55
+    expect(rows[1].ra).toBeGreaterThan(0); // RA appears at 55
+  });
+
+  it("RA at formation is at least the SA balance (SA fully transferred)", () => {
+    const rows = projectYears(base55);
+    // SA at year 0 grown by one year of interest before the transfer
+    const saAfterGrowth = Math.round(base55.saStart * (1 + base55.saReturn / 100));
+    expect(rows[1].ra).toBeGreaterThanOrEqual(saAfterGrowth);
+  });
+
+  it("RA at end of formation year exceeds FRS (seeded at FRS + year's contributions)", () => {
+    // SA (100k) < FRS (213k) so OA tops up to FRS at the transfer moment.
+    // rows[1].ra then grows further: extra interest + 12 months of SA-allocation contributions.
+    const rows = projectYears(base55);
+    expect(rows[1].ra).toBeGreaterThan(CPF_FRS_2026);
+  });
+
+  it("OA is reduced by the top-up amount at formation", () => {
+    const rows = projectYears(base55);
+    // OA at formation = oaStart * (1+oaReturn) - topUp (plus contributions added AFTER formation)
+    // Just verify OA is strictly less than it would have been without RA
+    const noRa = projectYears({ ...base55, frs: 0 });
+    expect(rows[1].oa).toBeLessThan(noRa[1].oa);
+  });
+
+  it("when SA >= FRS no OA is transferred", () => {
+    // Give SA > FRS: only SA transferred, OA untouched
+    const richSA = { ...base55, saStart: 250_000, frs: CPF_FRS_2026 };
+    const rows = projectYears(richSA);
+    // OA should grow normally without a top-up deduction
+    const noRa = projectYears({ ...richSA, frs: 0 });
+    expect(rows[1].oa).toBe(noRa[1].oa);
+  });
+
+  it("total is continuous across RA formation (no value disappears)", () => {
+    const rows = projectYears(base55);
+    // Total must still grow from year 0 to year 1 (contributions + interest > 0)
+    expect(rows[1].total).toBeGreaterThan(rows[0].total);
+  });
+
+  it("user starting at age 55 has raFormed=true from row 0 (saStart treated as RA)", () => {
+    const rows = projectYears({ ...base55, age: 55 });
+    expect(rows[0].raFormed).toBe(true);
+    expect(rows[0].sa).toBe(0);
+    expect(rows[0].ra).toBe(base55.saStart);
   });
 });
 
@@ -318,6 +396,156 @@ describe("calcFd", () => {
 
 // ─── FIRE number invariant ────────────────────────────────────────────────────
 
+// ─── MA Basic Healthcare Sum (BHS) cap ───────────────────────────────────────
+
+describe("MA BHS cap", () => {
+  // Project from age 40 with high salary so MA quickly hits BHS
+  const baseBhs = {
+    salary: 8000, age: 40, prYear: 3, annualIncrement: 0, yearsToProject: 30,
+    oaReturn: 2.5, saReturn: 4, maReturn: 4,
+    oaStart: 0, saStart: 0, maStart: 0,
+    bhs: CPF_BHS_2026, bhsGrowthRate: 0, frsGrowthRate: 0,
+  };
+
+  it("MA never exceeds the BHS (with 0% BHS growth)", () => {
+    const rows = projectYears(baseBhs);
+    rows.forEach(r => expect(r.ma).toBeLessThanOrEqual(CPF_BHS_2026 + 1)); // +1 for rounding
+  });
+
+  it("MA eventually reaches and stays at BHS", () => {
+    const rows = projectYears(baseBhs);
+    const capped = rows.filter(r => r.ma >= CPF_BHS_2026 - 1);
+    expect(capped.length).toBeGreaterThan(0);
+  });
+
+  it("total is higher when BHS overflows to SA (overflow is not lost)", () => {
+    const withBhs    = projectYears({ ...baseBhs, yearsToProject: 10 });
+    // Simulate no BHS cap by setting bhs very high
+    const withoutBhs = projectYears({ ...baseBhs, yearsToProject: 10, bhs: 999_999_999 });
+    // Total must be equal — overflow goes to SA, not discarded
+    const last  = withBhs[withBhs.length - 1];
+    const lastU = withoutBhs[withoutBhs.length - 1];
+    expect(last.total).toBeCloseTo(lastU.total, -1); // within ~$10
+  });
+
+  it("MA overflow goes to SA before age 55", () => {
+    const rows = projectYears({ ...baseBhs, yearsToProject: 5 });
+    // After BHS is hit, SA should grow faster than without cap
+    const noCap = projectYears({ ...baseBhs, yearsToProject: 5, bhs: 999_999_999 });
+    const last     = rows[rows.length - 1];
+    const lastNoCap = noCap[noCap.length - 1];
+    expect(last.sa).toBeGreaterThanOrEqual(lastNoCap.sa);
+  });
+
+  it("MA overflow goes to RA after age 55", () => {
+    const post55 = projectYears({
+      ...baseBhs, age: 55, yearsToProject: 5, maStart: CPF_BHS_2026, saStart: 50000,
+    });
+    // raFormed should be true from the start; any MA overflow goes to RA
+    expect(post55[0].raFormed).toBe(true);
+    const noCap = projectYears({
+      ...baseBhs, age: 55, yearsToProject: 5, maStart: CPF_BHS_2026, saStart: 50000, bhs: 999_999_999,
+    });
+    const last     = post55[post55.length - 1];
+    const lastNoCap = noCap[noCap.length - 1];
+    expect(last.ra).toBeGreaterThanOrEqual(lastNoCap.ra);
+  });
+
+  it("BHS grows with bhsGrowthRate so MA can grow further", () => {
+    const growing  = projectYears({ ...baseBhs, bhsGrowthRate: 3.5, yearsToProject: 10 });
+    const static_  = projectYears({ ...baseBhs, bhsGrowthRate: 0,   yearsToProject: 10 });
+    // With a growing BHS cap, MA is allowed to accumulate more
+    expect(growing[10].ma).toBeGreaterThan(static_[10].ma);
+  });
+
+  it("row includes bhs field reflecting the year's cap", () => {
+    const rows = projectYears({ ...baseBhs, bhsGrowthRate: 3.5, yearsToProject: 3 });
+    expect(rows[0].bhs).toBe(CPF_BHS_2026);
+    expect(rows[3].bhs).toBeGreaterThan(CPF_BHS_2026);
+  });
+});
+
+// ─── FRS inflation at RA formation ───────────────────────────────────────────
+
+describe("FRS inflation", () => {
+  const base55 = {
+    salary: 6000, age: 50, prYear: 3, annualIncrement: 0, yearsToProject: 6,
+    oaReturn: 2.5, saReturn: 4, maReturn: 4,
+    oaStart: 300_000, saStart: 100_000, maStart: 50_000,
+    frs: CPF_FRS_2026, bhs: CPF_BHS_2026,
+    bhsGrowthRate: 0,
+  };
+
+  it("with frsGrowthRate=0, effective FRS equals CPF_FRS_2026", () => {
+    const rows = projectYears({ ...base55, frsGrowthRate: 0 });
+    const raRow = rows.find(d => d.raFormed && !rows[rows.indexOf(d) - 1]?.raFormed);
+    // OA transferred = FRS - SA_after_growth (capped at available OA)
+    // Just verify RA at formation is at least FRS
+    expect(raRow.ra).toBeGreaterThan(CPF_FRS_2026);
+  });
+
+  it("higher frsGrowthRate increases OA top-up (more OA transferred to RA)", () => {
+    const low  = projectYears({ ...base55, frsGrowthRate: 0 });
+    const high = projectYears({ ...base55, frsGrowthRate: 4 });
+    // Higher FRS → more OA transferred → OA lower, RA higher at formation year
+    const lowRaYear  = low.find(d => d.raFormed);
+    const highRaYear = high.find(d => d.raFormed);
+    expect(highRaYear.ra).toBeGreaterThanOrEqual(lowRaYear.ra);
+    expect(highRaYear.oa).toBeLessThanOrEqual(lowRaYear.oa);
+  });
+});
+
+// ─── estimateCpfLifePayout ────────────────────────────────────────────────────
+
+describe("estimateCpfLifePayout", () => {
+  const baseProj = {
+    salary: 6000, age: 40, prYear: 3, annualIncrement: 0, yearsToProject: 30,
+    oaReturn: 2.5, saReturn: 4, maReturn: 4,
+    oaStart: 0, saStart: 0, maStart: 0,
+    frs: CPF_FRS_2026, bhs: 999_999_999, frsGrowthRate: 0, bhsGrowthRate: 0,
+  };
+
+  it("returns null when no RA forms", () => {
+    // Project only 10 years from age 40 — RA never forms
+    const rows = projectYears({ ...baseProj, yearsToProject: 10 });
+    expect(estimateCpfLifePayout(rows, 4)).toBeNull();
+  });
+
+  it("returns a result with monthlyPayout > 0 when RA forms and projection covers 65", () => {
+    const rows   = projectYears(baseProj); // age 40+30 = 70, covers 65
+    const result = estimateCpfLifePayout(rows, 4);
+    expect(result).not.toBeNull();
+    expect(result.monthlyPayout).toBeGreaterThan(0);
+    expect(result.extrapolated).toBe(false);
+  });
+
+  it("extrapolates when projection ends before payoutAge", () => {
+    // Project to age 60 only — RA forms at 55 but payout at 65 not covered
+    const rows   = projectYears({ ...baseProj, yearsToProject: 20 });
+    const result = estimateCpfLifePayout(rows, 4);
+    expect(result).not.toBeNull();
+    expect(result.extrapolated).toBe(true);
+    expect(result.fromAge).toBe(60);
+    expect(result.payoutAge).toBe(65);
+  });
+
+  it("monthlyPayout = raAtPayout * CPF_LIFE_RATE / 12 (rounded)", () => {
+    const rows   = projectYears(baseProj);
+    const result = estimateCpfLifePayout(rows, 4);
+    expect(result.monthlyPayout).toBe(Math.round(result.raAtPayout * CPF_LIFE_RATE / 12));
+  });
+
+  it("larger RA produces higher monthly payout", () => {
+    const low  = projectYears({ ...baseProj, salary: 4000 });
+    const high = projectYears({ ...baseProj, salary: 8000 });
+    const payLow  = estimateCpfLifePayout(low,  4);
+    const payHigh = estimateCpfLifePayout(high, 4);
+    expect(payHigh.monthlyPayout).toBeGreaterThan(payLow.monthlyPayout);
+  });
+});
+
+// ─── FIRE number formula ──────────────────────────────────────────────────────
+
 describe("FIRE number formula", () => {
   // FIRE number = annual expenses / withdrawal rate (pure arithmetic)
   const fireNumber = (monthlyExp, ratePct) => (monthlyExp * 12) / (ratePct / 100);
@@ -332,5 +560,183 @@ describe("FIRE number formula", () => {
 
   it("higher withdrawal rate produces a lower FIRE number", () => {
     expect(fireNumber(3000, 5)).toBeLessThan(fireNumber(3000, 4));
+  });
+});
+
+// ─── migrations ───────────────────────────────────────────────────────────────
+
+// Minimal localStorage stub for Node environment (vitest runs in Node)
+const store = {};
+const localStorageStub = {
+  getItem:    k => (k in store ? store[k] : null),
+  setItem:    (k, v) => { store[k] = String(v); },
+  removeItem: k => { delete store[k]; },
+  clear:      ()    => { Object.keys(store).forEach(k => delete store[k]); },
+};
+
+beforeEach(() => {
+  localStorageStub.clear();
+  global.localStorage = localStorageStub;
+});
+
+afterEach(() => {
+  delete global.localStorage;
+});
+
+describe("runMigrations", () => {
+  it("sets _schema_version to CURRENT_VERSION on a fresh store", () => {
+    runMigrations();
+    expect(localStorage.getItem(SCHEMA_KEY)).toBe(String(CURRENT_VERSION));
+  });
+
+  it("is idempotent — running twice does not corrupt data", () => {
+    localStorage.setItem("stocks_v1", JSON.stringify([{ ticker: "AAPL", shares: 10, avgCost: 150 }]));
+    runMigrations();
+    runMigrations();
+    const rows = JSON.parse(localStorage.getItem("stocks_v1"));
+    expect(rows).toHaveLength(1);
+    expect(rows[0].ticker).toBe("AAPL");
+  });
+
+  it("skips migration when version is already current", () => {
+    localStorage.setItem(SCHEMA_KEY, String(CURRENT_VERSION));
+    // Corrupt the stocks store — migration must NOT run and overwrite it
+    localStorage.setItem("stocks_v1", "NOT_JSON");
+    runMigrations();
+    expect(localStorage.getItem("stocks_v1")).toBe("NOT_JSON");
+  });
+
+  it("v0→v1: backfills missing id onto stocks_v1 records", () => {
+    localStorage.setItem("stocks_v1", JSON.stringify([
+      { ticker: "AAPL", shares: 10, avgCost: 150 },
+    ]));
+    runMigrations();
+    const rows = JSON.parse(localStorage.getItem("stocks_v1"));
+    expect(rows[0]).toHaveProperty("id");
+    expect(typeof rows[0].id).toBe("string");
+    expect(rows[0].id.length).toBeGreaterThan(0);
+  });
+
+  it("v0→v1: backfills totalFees and notes onto stocks_v1 records", () => {
+    localStorage.setItem("stocks_v1", JSON.stringify([
+      { ticker: "AAPL", shares: 10, avgCost: 150 },
+    ]));
+    runMigrations();
+    const rows = JSON.parse(localStorage.getItem("stocks_v1"));
+    expect(rows[0].totalFees).toBe(0);
+    expect(rows[0].notes).toBe("");
+  });
+
+  it("v0→v1: preserves existing field values — does not overwrite non-missing fields", () => {
+    localStorage.setItem("stocks_v1", JSON.stringify([
+      { id: "abc123", ticker: "TSLA", shares: 5, avgCost: 200, totalFees: 9.99, notes: "existing" },
+    ]));
+    runMigrations();
+    const rows = JSON.parse(localStorage.getItem("stocks_v1"));
+    expect(rows[0].id).toBe("abc123");
+    expect(rows[0].totalFees).toBe(9.99);
+    expect(rows[0].notes).toBe("existing");
+  });
+
+  it("v0→v1: backfills notes onto fd_v1 records", () => {
+    localStorage.setItem("fd_v1", JSON.stringify([
+      { bank: "Maybank", principal: 50000, rate: 3.85, tenureMonths: 12 },
+    ]));
+    runMigrations();
+    const rows = JSON.parse(localStorage.getItem("fd_v1"));
+    expect(rows[0].notes).toBe("");
+  });
+
+  it("v0→v1: backfills downpaymentRecords and progressiveRecords onto hl_props_v1", () => {
+    localStorage.setItem("hl_props_v1", JSON.stringify([
+      { name: "Test Condo", purchasePrice: 500000, interestRate: 4, tenure: 35 },
+    ]));
+    runMigrations();
+    const rows = JSON.parse(localStorage.getItem("hl_props_v1"));
+    expect(Array.isArray(rows[0].downpaymentRecords)).toBe(true);
+    expect(Array.isArray(rows[0].progressiveRecords)).toBe(true);
+  });
+
+  it("v0→v1: leaves empty collections intact", () => {
+    localStorage.setItem("stocks_v1", JSON.stringify([]));
+    runMigrations();
+    const rows = JSON.parse(localStorage.getItem("stocks_v1"));
+    expect(rows).toHaveLength(0);
+  });
+
+  it("v0→v1: handles missing collections gracefully (no error)", () => {
+    expect(() => runMigrations()).not.toThrow();
+  });
+});
+
+// ─── SA Shielding ─────────────────────────────────────────────────────────────
+
+describe("SA Shielding (CPFIS-SA)", () => {
+  const base = {
+    salary: 6000, age: 50, prYear: 3,
+    annualIncrement: 0, yearsToProject: 10,
+    oaReturn: 2.5, saReturn: 4, maReturn: 4,
+    oaStart: 50000, saStart: 80000, maStart: 10000,
+    frsGrowthRate: 0, bhsGrowthRate: 0,
+  };
+
+  it("without shielding: cpfis is 0 for all rows", () => {
+    const rows = projectYears(base);
+    expect(rows.every(r => r.cpfis === 0)).toBe(true);
+  });
+
+  it("with shielding: cpfis starts at min(saShield, saStart)", () => {
+    const rows = projectYears({ ...base, saShield: 30000 });
+    expect(rows[0].cpfis).toBe(30000);
+  });
+
+  it("shield is capped at saStart if saShield > saStart", () => {
+    const rows = projectYears({ ...base, saShield: 999999 });
+    expect(rows[0].cpfis).toBe(base.saStart);
+  });
+
+  it("with shielding: saBalance at year 0 is saStart minus shield", () => {
+    const rows = projectYears({ ...base, saShield: 30000 });
+    expect(rows[0].sa).toBe(base.saStart - 30000);
+  });
+
+  it("cpfis grows at saReturn rate each year before RA formation", () => {
+    const rows = projectYears({ ...base, saShield: 30000 });
+    expect(rows[1].cpfis).toBeCloseTo(30000 * 1.04, 0);
+  });
+
+  it("cpfis becomes 0 after RA formation (liquidated to OA)", () => {
+    const rows = projectYears({ ...base, saShield: 30000 });
+    const afterRa = rows.filter(r => r.raFormed);
+    expect(afterRa.every(r => r.cpfis === 0)).toBe(true);
+  });
+
+  it("OA at RA formation is higher with shielding than without", () => {
+    const withShield    = projectYears({ ...base, saShield: 30000 });
+    const withoutShield = projectYears(base);
+    const shieldRaRow   = withShield.find(r => r.raFormed);
+    const noShieldRaRow = withoutShield.find(r => r.raFormed);
+    expect(shieldRaRow.oa).toBeGreaterThan(noShieldRaRow.oa);
+  });
+
+  it("RA at formation is lower with shielding (less SA was available to transfer)", () => {
+    const withShield    = projectYears({ ...base, saShield: 30000 });
+    const withoutShield = projectYears(base);
+    const shieldRaRow   = withShield.find(r => r.raFormed);
+    const noShieldRaRow = withoutShield.find(r => r.raFormed);
+    expect(shieldRaRow.ra).toBeLessThan(noShieldRaRow.ra);
+  });
+
+  it("total at year 0 includes cpfis", () => {
+    const rows = projectYears({ ...base, saShield: 30000 });
+    expect(rows[0].total).toBe(rows[0].oa + rows[0].sa + rows[0].ra + rows[0].ma + rows[0].cpfis);
+  });
+
+  it("total is continuous — shield returning to OA does not lose value", () => {
+    const rows = projectYears({ ...base, saShield: 30000 });
+    rows.forEach((r, i) => {
+      if (i === 0) return;
+      expect(r.total).toBeGreaterThan(rows[i - 1].total);
+    });
   });
 });

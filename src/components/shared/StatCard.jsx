@@ -8,7 +8,7 @@ export function StatCard({ label, value, sub, color }) {
       padding: "18px 20px",
       border: "1px solid var(--border)",
       flex: "1 1 0",
-      minWidth: 140,
+      minWidth: 0,
     }}>
       <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, marginBottom: 6 }}>{label}</div>
       <div style={{ fontSize: 22, fontWeight: 800, color: color || "var(--text)", fontFamily: "'DM Mono', monospace" }}>{value}</div>

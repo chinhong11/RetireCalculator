@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { USD, uid } from "../../lib/finance.js";
 import { toCsv, downloadBlob, printTable } from "../../lib/backup.js";
 import { StatCard } from "../shared/StatCard.jsx";
+import { fetchYahooChart } from "../../lib/fetchPrice.js";
 
 export default function StocksTab() {
   const [holdings, setHoldings] = useState(() => {
@@ -33,21 +34,8 @@ export default function StocksTab() {
     setFetching(s => new Set([...s, ticker]));
     setFetchErrors(e => { const n = { ...e }; delete n[ticker]; return n; });
     try {
-      const res = await fetch(
-        `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const meta = data?.chart?.result?.[0]?.meta;
-      if (!meta?.regularMarketPrice) throw new Error("Price unavailable");
-      setPrices(p => ({
-        ...p,
-        [ticker]: {
-          price: meta.regularMarketPrice,
-          prevClose: meta.previousClose ?? meta.chartPreviousClose,
-          at: Date.now(),
-        },
-      }));
+      const { price, prevClose } = await fetchYahooChart(ticker);
+      setPrices(p => ({ ...p, [ticker]: { price, prevClose, at: Date.now() } }));
     } catch (err) {
       setFetchErrors(e => ({ ...e, [ticker]: err.message || "Failed" }));
     }
@@ -200,9 +188,9 @@ export default function StocksTab() {
               onChange={e => setForm(f => ({ ...f, fees: e.target.value }))} min={0} step={0.01}
               style={{ fontFamily: "'DM Mono', monospace" }} />
           </div>
-          <div style={{ flex: "0 0 auto" }}>
+          <div style={{ flex: "1 1 130px" }}>
             <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Buy Date</label>
-            <input className="hl-in" type="date" style={{ width: 155 }} value={form.buyDate}
+            <input className="hl-in" type="date" value={form.buyDate}
               onChange={e => setForm(f => ({ ...f, buyDate: e.target.value }))} />
           </div>
           <div style={{ flex: "2 1 160px" }}>
