@@ -32,7 +32,8 @@ export default function CPFCalculator() {
   const [oaStart, setOaStart] = useState(() => { try { return parseFloat(localStorage.getItem("cpf_oa_start") || "0") || 0; } catch { return 0; } });
   const [saStart, setSaStart] = useState(() => { try { return parseFloat(localStorage.getItem("cpf_sa_start") || "0") || 0; } catch { return 0; } });
   const [maStart, setMaStart] = useState(() => { try { return parseFloat(localStorage.getItem("cpf_ma_start") || "0") || 0; } catch { return 0; } });
-  const [activeTab, setActiveTab]         = useState("summary");
+  const [activeTab, setActiveTab] = useState(() => localStorage.getItem("active_tab") || "summary");
+  useEffect(() => { try { localStorage.setItem("active_tab", activeTab); } catch {} }, [activeTab]);
 
   useEffect(() => { try { localStorage.setItem("cpf_oa_start", oaStart); } catch {} }, [oaStart]);
   useEffect(() => { try { localStorage.setItem("cpf_sa_start", saStart); } catch {} }, [saStart]);
