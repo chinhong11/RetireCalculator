@@ -1,3 +1,25 @@
+/**
+ * @typedef {{ employee: number, employer: number, total: number }} ContribRates
+ * @typedef {{ oa: number, sa: number, ma: number }} AllocationRatios
+ * @typedef {{
+ *   salary: number, cappedOW: number,
+ *   employeeContrib: number, employerContrib: number, totalContrib: number,
+ *   takeHome: number,
+ *   oaAmount: number, saAmount: number, maAmount: number,
+ *   rates: ContribRates, allocation: AllocationRatios,
+ * }} MonthlyResult
+ * @typedef {{
+ *   year: number, label: string, age: number, prYear: number,
+ *   salary: number, oa: number, sa: number, ra: number, ma: number,
+ *   cpfis: number, bhs: number, total: number, raFormed: boolean,
+ *   monthlyContrib: number, annualContrib: number, takeHome: number,
+ * }} ProjectionRow
+ * @typedef {{
+ *   raAtPayout: number, monthlyPayout: number,
+ *   extrapolated: boolean, fromAge: number | null, payoutAge: number,
+ * }} CpfLifePayout
+ */
+
 // ─── CPF Rate Tables (from 1 Jan 2026) ───────────────────────────────
 export const CPF_RATES = {
   "spr1": { // 1st year SPR (G/G)
@@ -47,6 +69,7 @@ export const CPF_BHS_2026 = 71_500;
 // CPF LIFE Standard Plan approximate annual payout rate on RA at payout age.
 export const CPF_LIFE_RATE = 0.063;
 
+/** @param {number} age @returns {string} */
 export function getRateKey(age) {
   if (age <= 55) return "55";
   if (age <= 60) return "60";
@@ -55,6 +78,7 @@ export function getRateKey(age) {
   return "999";
 }
 
+/** @param {number} age @returns {string} */
 export function getAllocationKey(age) {
   if (age <= 35) return "35";
   if (age <= 45) return "45";
@@ -66,12 +90,18 @@ export function getAllocationKey(age) {
   return "999";
 }
 
+/** @param {number} prYear @returns {string} */
 export function getSPRKey(prYear) {
   if (prYear <= 1) return "spr1";
   if (prYear <= 2) return "spr2";
   return "spr3";
 }
 
+/**
+ * @param {number} age
+ * @param {number} prYear
+ * @returns {ContribRates}
+ */
 export function getContribRates(age, prYear) {
   const sprKey = getSPRKey(prYear);
   const table = CPF_RATES[sprKey];
@@ -82,11 +112,18 @@ export function getContribRates(age, prYear) {
   return table[String(keys[keys.length - 1])];
 }
 
+/** @param {number} age @returns {AllocationRatios} */
 export function getAllocation(age) {
   const key = getAllocationKey(age);
   return ALLOCATION_RATIOS[key];
 }
 
+/**
+ * @param {number} salary  Monthly gross salary in SGD
+ * @param {number} age
+ * @param {number} prYear  1 = 1st-year SPR, 2 = 2nd-year, 3+ = SC/full
+ * @returns {MonthlyResult}
+ */
 export function computeMonthly(salary, age, prYear) {
   const cappedOW = Math.min(salary, OW_CEILING);
   const rates = getContribRates(age, prYear);
@@ -109,6 +146,19 @@ export function computeMonthly(salary, age, prYear) {
   };
 }
 
+/**
+ * Project CPF balances year-by-year.
+ * @param {{
+ *   salary: number, age: number, prYear: number,
+ *   annualIncrement: number, yearsToProject: number,
+ *   oaReturn: number, saReturn: number, maReturn: number,
+ *   oaStart?: number, saStart?: number, maStart?: number,
+ *   frs?: number, bhs?: number,
+ *   frsGrowthRate?: number, bhsGrowthRate?: number,
+ *   saShield?: number,
+ * }} params
+ * @returns {ProjectionRow[]}
+ */
 export function projectYears({
   salary, age, prYear, annualIncrement, yearsToProject,
   oaReturn, saReturn, maReturn,
@@ -230,9 +280,15 @@ export function projectYears({
   return data;
 }
 
-// Estimate CPF LIFE Standard Plan monthly payout.
-// Finds RA at payoutAge from projectionData; if the projection ends before
-// payoutAge, extrapolates with interest only (conservative — no contributions).
+/**
+ * Estimate CPF LIFE Standard Plan monthly payout.
+ * Finds RA at payoutAge; if the projection ends before payoutAge, extrapolates
+ * with interest only (conservative — no contributions assumed).
+ * @param {ProjectionRow[]} projectionData
+ * @param {number} saReturnPct
+ * @param {number} [payoutAge=65]
+ * @returns {CpfLifePayout | null}
+ */
 export function estimateCpfLifePayout(projectionData, saReturnPct, payoutAge = 65) {
   if (!projectionData?.length) return null;
   const last = projectionData[projectionData.length - 1];
