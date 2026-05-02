@@ -354,9 +354,30 @@ export default function CPFCalculator() {
         <MonthlyBreakdown monthly={monthly} prYear={prYear} age={age} />
 
         {/* ── Tab bar ─────────────────────────────────────────────────────── */}
-        <div style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}>
+        <div
+          role="tablist"
+          aria-label="Calculator sections"
+          style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}
+          onKeyDown={(e) => {
+            const ids = TABS.map(([id]) => id);
+            const cur = ids.indexOf(activeTab);
+            if (e.key === "ArrowRight") { e.preventDefault(); setActiveTab(ids[(cur + 1) % ids.length]); }
+            if (e.key === "ArrowLeft")  { e.preventDefault(); setActiveTab(ids[(cur - 1 + ids.length) % ids.length]); }
+            if (e.key === "Home")       { e.preventDefault(); setActiveTab(ids[0]); }
+            if (e.key === "End")        { e.preventDefault(); setActiveTab(ids[ids.length - 1]); }
+          }}
+        >
           {TABS.map(([id, label]) => (
-            <button key={id} className={`tab-btn ${activeTab === id ? "active" : ""}`} onClick={() => setActiveTab(id)}>
+            <button
+              key={id}
+              role="tab"
+              aria-selected={activeTab === id}
+              aria-controls={`tabpanel-${id}`}
+              id={`tab-${id}`}
+              tabIndex={activeTab === id ? 0 : -1}
+              className={`tab-btn ${activeTab === id ? "active" : ""}`}
+              onClick={() => setActiveTab(id)}
+            >
               {label}
             </button>
           ))}
@@ -364,7 +385,7 @@ export default function CPFCalculator() {
 
         {/* ── Tab content ─────────────────────────────────────────────────── */}
         {activeTab === "summary" && (
-          <div style={{ marginBottom: 28 }}>
+          <div role="tabpanel" id="tabpanel-summary" aria-labelledby="tab-summary" style={{ marginBottom: 28 }}>
             <ErrorBoundary key="summary">
               <SummaryTab cpfData={finalData} yearsToProject={yearsToProject} projectionData={projectionData} />
             </ErrorBoundary>
@@ -372,35 +393,39 @@ export default function CPFCalculator() {
         )}
 
         {activeTab === "projection" && (
-          <ErrorBoundary key="projection">
-            <ProjectionTab
-              projectionData={projectionData} finalData={finalData}
-              yearsToProject={yearsToProject} ceilingGrowth={ceilingGrowth}
-              saReturn={saReturn} cpfLifePayout={cpfLifePayout}
-              gridLineColor={tv["--grid-line"]}
-            />
-          </ErrorBoundary>
+          <div role="tabpanel" id="tabpanel-projection" aria-labelledby="tab-projection">
+            <ErrorBoundary key="projection">
+              <ProjectionTab
+                projectionData={projectionData} finalData={finalData}
+                yearsToProject={yearsToProject} ceilingGrowth={ceilingGrowth}
+                saReturn={saReturn} cpfLifePayout={cpfLifePayout}
+                gridLineColor={tv["--grid-line"]}
+              />
+            </ErrorBoundary>
+          </div>
         )}
 
         {activeTab === "table" && (
-          <ErrorBoundary key="table">
-            <ProjectionTableTab
-              projectionData={projectionData}
-              effectiveSaShield={effectiveSaShield}
-              rowAltColor={tv["--row-alt"]}
-            />
-          </ErrorBoundary>
+          <div role="tabpanel" id="tabpanel-table" aria-labelledby="tab-table">
+            <ErrorBoundary key="table">
+              <ProjectionTableTab
+                projectionData={projectionData}
+                effectiveSaShield={effectiveSaShield}
+                rowAltColor={tv["--row-alt"]}
+              />
+            </ErrorBoundary>
+          </div>
         )}
 
-        {activeTab === "housing"  && <div style={{ marginBottom: 28 }}><ErrorBoundary key="housing"><HousingLoanTab /></ErrorBoundary></div>}
-        {activeTab === "mystocks" && <div style={{ marginBottom: 28 }}><ErrorBoundary key="mystocks"><MYStocksTab /></ErrorBoundary></div>}
-        {activeTab === "stocks"   && <div style={{ marginBottom: 28 }}><ErrorBoundary key="stocks"><StocksTab /></ErrorBoundary></div>}
-        {activeTab === "crypto"   && <div style={{ marginBottom: 28 }}><ErrorBoundary key="crypto"><CryptoTab /></ErrorBoundary></div>}
-        {activeTab === "epf"      && <div style={{ marginBottom: 28 }}><ErrorBoundary key="epf"><EPFTab /></ErrorBoundary></div>}
-        {activeTab === "fd"       && <div style={{ marginBottom: 28 }}><ErrorBoundary key="fd"><FixedDepositsTab /></ErrorBoundary></div>}
-        {activeTab === "savings"  && <div style={{ marginBottom: 28 }}><ErrorBoundary key="savings"><SavingsTab projectionData={projectionData} yearsToProject={yearsToProject} cpfMonthly={monthly} salary={salary} /></ErrorBoundary></div>}
-        {activeTab === "fire"     && <div style={{ marginBottom: 28 }}><ErrorBoundary key="fire"><FireTab projectionData={projectionData} yearsToProject={yearsToProject} /></ErrorBoundary></div>}
-        {activeTab === "networth" && <div style={{ marginBottom: 28 }}><ErrorBoundary key="networth"><NetWorthTab projectionData={projectionData} yearsToProject={yearsToProject} /></ErrorBoundary></div>}
+        {activeTab === "housing"  && <div role="tabpanel" id="tabpanel-housing"  aria-labelledby="tab-housing"  style={{ marginBottom: 28 }}><ErrorBoundary key="housing"><HousingLoanTab /></ErrorBoundary></div>}
+        {activeTab === "mystocks" && <div role="tabpanel" id="tabpanel-mystocks" aria-labelledby="tab-mystocks" style={{ marginBottom: 28 }}><ErrorBoundary key="mystocks"><MYStocksTab /></ErrorBoundary></div>}
+        {activeTab === "stocks"   && <div role="tabpanel" id="tabpanel-stocks"   aria-labelledby="tab-stocks"   style={{ marginBottom: 28 }}><ErrorBoundary key="stocks"><StocksTab /></ErrorBoundary></div>}
+        {activeTab === "crypto"   && <div role="tabpanel" id="tabpanel-crypto"   aria-labelledby="tab-crypto"   style={{ marginBottom: 28 }}><ErrorBoundary key="crypto"><CryptoTab /></ErrorBoundary></div>}
+        {activeTab === "epf"      && <div role="tabpanel" id="tabpanel-epf"      aria-labelledby="tab-epf"      style={{ marginBottom: 28 }}><ErrorBoundary key="epf"><EPFTab /></ErrorBoundary></div>}
+        {activeTab === "fd"       && <div role="tabpanel" id="tabpanel-fd"       aria-labelledby="tab-fd"       style={{ marginBottom: 28 }}><ErrorBoundary key="fd"><FixedDepositsTab /></ErrorBoundary></div>}
+        {activeTab === "savings"  && <div role="tabpanel" id="tabpanel-savings"  aria-labelledby="tab-savings"  style={{ marginBottom: 28 }}><ErrorBoundary key="savings"><SavingsTab projectionData={projectionData} yearsToProject={yearsToProject} cpfMonthly={monthly} salary={salary} /></ErrorBoundary></div>}
+        {activeTab === "fire"     && <div role="tabpanel" id="tabpanel-fire"     aria-labelledby="tab-fire"     style={{ marginBottom: 28 }}><ErrorBoundary key="fire"><FireTab projectionData={projectionData} yearsToProject={yearsToProject} /></ErrorBoundary></div>}
+        {activeTab === "networth" && <div role="tabpanel" id="tabpanel-networth" aria-labelledby="tab-networth" style={{ marginBottom: 28 }}><ErrorBoundary key="networth"><NetWorthTab projectionData={projectionData} yearsToProject={yearsToProject} /></ErrorBoundary></div>}
 
         {/* ── Bottom summary cards ─────────────────────────────────────────── */}
         <CpfSummaryCards
