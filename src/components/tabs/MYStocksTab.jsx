@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { RM, RM2, uid } from "../../lib/finance.js";
 import { toCsv, downloadBlob, printTable } from "../../lib/backup.js";
 import { StatCard } from "../shared/StatCard.jsx";
+import { fetchYahooChart } from "../../lib/fetchPrice.js";
 
 export default function MYStocksTab() {
   const [holdings, setHoldings] = useState(() => {
@@ -39,17 +40,8 @@ export default function MYStocksTab() {
     setFetching(s => new Set([...s, code]));
     setFetchErrors(e => { const n = { ...e }; delete n[code]; return n; });
     try {
-      const res = await fetch(
-        `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(ticker)}?interval=1d&range=1d`
-      );
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data = await res.json();
-      const meta = data?.chart?.result?.[0]?.meta;
-      if (!meta?.regularMarketPrice) throw new Error("Price unavailable");
-      setPrices(p => ({
-        ...p,
-        [code]: { price: meta.regularMarketPrice, prevClose: meta.previousClose ?? meta.chartPreviousClose, at: Date.now() },
-      }));
+      const { price, prevClose } = await fetchYahooChart(ticker);
+      setPrices(p => ({ ...p, [code]: { price, prevClose, at: Date.now() } }));
     } catch (err) {
       setFetchErrors(e => ({ ...e, [code]: err.message || "Failed" }));
     }
