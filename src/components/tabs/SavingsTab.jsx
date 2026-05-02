@@ -5,6 +5,8 @@ import { EXPENSE_CATS, EXPENSE_CAT_COLORS } from "../../lib/finance.js";
 export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly, salary }) {
   const [takeHome, setTakeHome]       = useState(() => parseFloat(localStorage.getItem("sav_income") || "0"));
   const [otherIncome, setOtherIncome] = useState(() => parseFloat(localStorage.getItem("sav_other") || "0"));
+  const [startCash, setStartCash]     = useState(() => parseFloat(localStorage.getItem("sav_start_cash") || "0"));
+  const [cashReturn, setCashReturn]   = useState(() => parseFloat(localStorage.getItem("sav_cash_return") || "0"));
   const [expenses, setExpenses]       = useState(() => {
     try { const s = localStorage.getItem("sav_expenses_v1"); return s ? JSON.parse(s) : []; } catch { return []; }
   });
@@ -14,6 +16,8 @@ export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly,
 
   useEffect(() => { localStorage.setItem("sav_income", takeHome); }, [takeHome]);
   useEffect(() => { localStorage.setItem("sav_other", otherIncome); }, [otherIncome]);
+  useEffect(() => { localStorage.setItem("sav_start_cash", startCash); }, [startCash]);
+  useEffect(() => { localStorage.setItem("sav_cash_return", cashReturn); }, [cashReturn]);
   useEffect(() => { try { localStorage.setItem("sav_expenses_v1", JSON.stringify(expenses)); } catch {} }, [expenses]);
 
   const goals    = useMemo(() => { try { const s = localStorage.getItem("goals_v1"); return s ? JSON.parse(s) : []; } catch { return []; } }, []);
@@ -49,10 +53,20 @@ export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly,
     return Object.entries(map).sort((a, b) => b[1] - a[1]);
   }, [expenses]);
 
-  const savingsProjection = useMemo(() => projectionData.map((d, i) => ({
-    year: i, age: d.age, cpf: d.total,
-    cash: Math.max(0, Math.round(annualSavings * i)),
-  })), [projectionData, annualSavings]);
+  const savingsProjection = useMemo(() => {
+    const r = cashReturn / 100;
+    return projectionData.map((d, i) => {
+      let cash;
+      if (r === 0) {
+        cash = startCash + annualSavings * i;
+      } else {
+        // FV of lump sum + FV of constant annual contributions
+        const growth = Math.pow(1 + r, i);
+        cash = startCash * growth + annualSavings * (growth - 1) / r;
+      }
+      return { year: i, age: d.age, cpf: d.total, cash: Math.max(0, Math.round(cash)) };
+    });
+  }, [projectionData, annualSavings, startCash, cashReturn]);
 
   const fmtSGD   = v => "S$" + Math.round(v).toLocaleString();
   const cardStyle  = { borderRadius: 12, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)" };
@@ -96,6 +110,21 @@ export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly,
           <div>
             <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>Other income (freelance, rental, etc.)</div>
             <input type="number" min={0} value={otherIncome} onChange={e => setOtherIncome(parseFloat(e.target.value) || 0)} style={inputStyle} />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>Cash / savings starting balance (SGD)</div>
+            <input type="number" min={0} value={startCash} onChange={e => setStartCash(parseFloat(e.target.value) || 0)} style={inputStyle} />
+          </div>
+          <div>
+            <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>
+              Cash return rate — {cashReturn.toFixed(1)}% / yr
+            </div>
+            <input type="range" min={0} max={10} step={0.5} value={cashReturn}
+              onChange={e => setCashReturn(parseFloat(e.target.value))}
+              style={{ width: "100%", accentColor: "var(--accent)" }} />
+            <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10, color: "var(--muted)", marginTop: 2 }}>
+              <span>0% (no growth)</span><span>5% (index fund)</span><span>10%</span>
+            </div>
           </div>
         </div>
       </div>
@@ -227,7 +256,9 @@ export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly,
 
         <div style={cardStyle}>
           <div style={{ fontSize: 12, color: "var(--label)", fontWeight: 600, marginBottom: 4 }}>Wealth Accumulation Projection</div>
-          <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 16 }}>Cash savings (flat) stacked with CPF projection</div>
+          <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 16 }}>
+            Cash {cashReturn > 0 ? `compounding at ${cashReturn.toFixed(1)}% p.a.` : "(no investment return)"} stacked with CPF projection
+          </div>
           <ResponsiveContainer width="100%" height={240}>
             <AreaChart data={savingsProjection} margin={{ top: 5, right: 20, left: 10, bottom: 5 }}>
               <defs>
@@ -257,7 +288,7 @@ export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly,
           <div style={{ display: "flex", gap: 16, marginTop: 10, flexWrap: "wrap" }}>
             {[
               { color: "#6ee7b7", label: "CPF (projected)" },
-              { color: rateColor, label: "Cash savings (flat monthly rate)" },
+              { color: rateColor, label: cashReturn > 0 ? `Cash savings (${cashReturn.toFixed(1)}% p.a.)` : "Cash savings (no return)" },
             ].map(({ color, label }) => (
               <div key={label} style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <div style={{ width: 10, height: 10, borderRadius: 2, background: color }} />
@@ -347,7 +378,7 @@ export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly,
       )}
 
       <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7 }}>
-        <strong style={{ color: "var(--label)" }}>Note:</strong> Savings rate = (Income − Expenses) ÷ Income. The 20% benchmark is a widely-used personal finance guideline. Cash savings projection assumes a flat monthly rate with no investment returns. Goals check uses cash savings only; CPF is shown separately. FX for non-SGD goals uses the rates set in the Net Worth tab. For personal planning only — not financial advice.
+        <strong style={{ color: "var(--label)" }}>Note:</strong> Savings rate = (Income − Expenses) ÷ Income. The 20% benchmark is a widely-used personal finance guideline. Cash projection uses FV of lump sum plus FV of annual contributions at the chosen return rate (0% = simple accumulation). Goals check uses cash savings only; CPF is shown separately. FX for non-SGD goals uses the rates set in the Net Worth tab. For personal planning only — not financial advice.
       </div>
     </div>
   );

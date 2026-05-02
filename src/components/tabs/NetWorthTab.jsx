@@ -1,13 +1,26 @@
 import { useState, useEffect, useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { projectEpfYears } from "../../lib/epf.js";
+import { fetchFxRates } from "../../lib/fetchFx.js";
 
 export default function NetWorthTab({ projectionData, yearsToProject }) {
   const [usdToSgd, setUsdToSgd] = useState(() => parseFloat(localStorage.getItem("fx_usd_sgd") || "1.35"));
   const [myrToSgd, setMyrToSgd] = useState(() => parseFloat(localStorage.getItem("fx_myr_sgd") || "0.30"));
+  const [fxStatus, setFxStatus] = useState("idle"); // "idle" | "loading" | "live" | "error"
 
   useEffect(() => { localStorage.setItem("fx_usd_sgd", usdToSgd); }, [usdToSgd]);
   useEffect(() => { localStorage.setItem("fx_myr_sgd", myrToSgd); }, [myrToSgd]);
+
+  useEffect(() => {
+    setFxStatus("loading");
+    fetchFxRates()
+      .then(rates => {
+        setUsdToSgd(parseFloat(rates.usdToSgd.toFixed(4)));
+        setMyrToSgd(parseFloat(rates.myrToSgd.toFixed(4)));
+        setFxStatus(rates.fromCache ? "live" : "live");
+      })
+      .catch(() => setFxStatus("error"));
+  }, []);
 
   const stockHoldings  = useMemo(() => { try { const s = localStorage.getItem("stocks_v1");   return s ? JSON.parse(s) : []; } catch { return []; } }, []);
   const cryptoHoldings = useMemo(() => { try { const s = localStorage.getItem("crypto_v1");   return s ? JSON.parse(s) : []; } catch { return []; } }, []);
@@ -107,7 +120,12 @@ export default function NetWorthTab({ projectionData, yearsToProject }) {
     <div style={{ display: "flex", flexDirection: "column", gap: 18 }}>
 
       <div style={{ ...cardStyle }}>
-        <div style={{ fontSize: 12, color: "var(--label)", fontWeight: 600, marginBottom: 12 }}>FX Rates (to SGD)</div>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
+          <div style={{ fontSize: 12, color: "var(--label)", fontWeight: 600 }}>FX Rates (to SGD)</div>
+          {fxStatus === "loading" && <span style={{ fontSize: 10, color: "var(--muted)" }}>fetching…</span>}
+          {fxStatus === "live"    && <span style={{ fontSize: 10, color: "#6ee7b7" }}>● live (frankfurter.app)</span>}
+          {fxStatus === "error"   && <span style={{ fontSize: 10, color: "#f87171" }}>⚠ offline — using saved rates</span>}
+        </div>
         <div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-end" }}>
           <div>
             <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>1 USD =</div>

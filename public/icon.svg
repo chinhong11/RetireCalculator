@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <rect width="512" height="512" rx="96" fill="#0f172a"/>
+  <!-- Bar chart icon -->
+  <rect x="80"  y="280" width="80" height="152" rx="8" fill="#6ee7b7"/>
+  <rect x="200" y="200" width="80" height="232" rx="8" fill="#818cf8"/>
+  <rect x="320" y="120" width="80" height="312" rx="8" fill="#f472b6"/>
+  <!-- Trend line -->
+  <polyline points="120,270 240,190 360,110" stroke="#fbbf24" stroke-width="16" stroke-linecap="round" stroke-linejoin="round" fill="none"/>
+  <circle cx="360" cy="110" r="20" fill="#fbbf24"/>
+  <!-- Dollar sign -->
+  <text x="256" y="88" text-anchor="middle" font-family="system-ui,sans-serif" font-size="56" font-weight="800" fill="#6ee7b7">S$</text>
+</svg>
