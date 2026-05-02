@@ -9,6 +9,7 @@ import { StatCard }       from "./components/shared/StatCard.jsx";
 import { AccountBar }     from "./components/shared/AccountBar.jsx";
 import { CustomTooltip }  from "./components/shared/CustomTooltip.jsx";
 import { BackupBar }      from "./components/shared/BackupBar.jsx";
+import { ErrorBoundary } from "./components/shared/ErrorBoundary.jsx";
 
 import HousingLoanTab    from "./components/tabs/HousingLoanTab.jsx";
 import StocksTab         from "./components/tabs/StocksTab.jsx";
@@ -366,7 +367,9 @@ export default function CPFCalculator() {
 
         {activeTab === "summary" && (
           <div style={{ marginBottom: 28 }}>
-            <SummaryTab cpfData={finalData} yearsToProject={yearsToProject} projectionData={projectionData} />
+            <ErrorBoundary key="summary">
+              <SummaryTab cpfData={finalData} yearsToProject={yearsToProject} projectionData={projectionData} />
+            </ErrorBoundary>
           </div>
         )}
 
@@ -499,15 +502,15 @@ export default function CPFCalculator() {
           </div>
         )}
 
-        {activeTab === "housing"  && <div style={{ marginBottom: 28 }}><HousingLoanTab /></div>}
-        {activeTab === "mystocks" && <div style={{ marginBottom: 28 }}><MYStocksTab /></div>}
-        {activeTab === "stocks"   && <div style={{ marginBottom: 28 }}><StocksTab /></div>}
-        {activeTab === "crypto"   && <div style={{ marginBottom: 28 }}><CryptoTab /></div>}
-        {activeTab === "epf"      && <div style={{ marginBottom: 28 }}><EPFTab /></div>}
-        {activeTab === "fd"       && <div style={{ marginBottom: 28 }}><FixedDepositsTab /></div>}
-        {activeTab === "savings"  && <div style={{ marginBottom: 28 }}><SavingsTab projectionData={projectionData} yearsToProject={yearsToProject} cpfMonthly={monthly} salary={salary} /></div>}
-        {activeTab === "fire"     && <div style={{ marginBottom: 28 }}><FireTab projectionData={projectionData} yearsToProject={yearsToProject} /></div>}
-        {activeTab === "networth" && <div style={{ marginBottom: 28 }}><NetWorthTab projectionData={projectionData} yearsToProject={yearsToProject} /></div>}
+        {activeTab === "housing"  && <div style={{ marginBottom: 28 }}><ErrorBoundary key="housing"><HousingLoanTab /></ErrorBoundary></div>}
+        {activeTab === "mystocks" && <div style={{ marginBottom: 28 }}><ErrorBoundary key="mystocks"><MYStocksTab /></ErrorBoundary></div>}
+        {activeTab === "stocks"   && <div style={{ marginBottom: 28 }}><ErrorBoundary key="stocks"><StocksTab /></ErrorBoundary></div>}
+        {activeTab === "crypto"   && <div style={{ marginBottom: 28 }}><ErrorBoundary key="crypto"><CryptoTab /></ErrorBoundary></div>}
+        {activeTab === "epf"      && <div style={{ marginBottom: 28 }}><ErrorBoundary key="epf"><EPFTab /></ErrorBoundary></div>}
+        {activeTab === "fd"       && <div style={{ marginBottom: 28 }}><ErrorBoundary key="fd"><FixedDepositsTab /></ErrorBoundary></div>}
+        {activeTab === "savings"  && <div style={{ marginBottom: 28 }}><ErrorBoundary key="savings"><SavingsTab projectionData={projectionData} yearsToProject={yearsToProject} cpfMonthly={monthly} salary={salary} /></ErrorBoundary></div>}
+        {activeTab === "fire"     && <div style={{ marginBottom: 28 }}><ErrorBoundary key="fire"><FireTab projectionData={projectionData} yearsToProject={yearsToProject} /></ErrorBoundary></div>}
+        {activeTab === "networth" && <div style={{ marginBottom: 28 }}><ErrorBoundary key="networth"><NetWorthTab projectionData={projectionData} yearsToProject={yearsToProject} /></ErrorBoundary></div>}
 
         {/* Summary Cards */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginBottom: 28 }}>

@@ -7,7 +7,10 @@ runMigrations();
 
 if ("serviceWorker" in navigator) {
   window.addEventListener("load", () => {
-    navigator.serviceWorker.register("/sw.js").catch(() => {});
+    // updateViaCache: "none" — browser always fetches sw.js fresh, bypassing
+    // HTTP cache. This means a new SW is detected on the very next navigation
+    // after a deploy, not hours later when the HTTP cache expires.
+    navigator.serviceWorker.register("/sw.js", { updateViaCache: "none" }).catch(() => {});
   });
 }
 

@@ -20,9 +20,20 @@ export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly,
   useEffect(() => { localStorage.setItem("sav_cash_return", cashReturn); }, [cashReturn]);
   useEffect(() => { try { localStorage.setItem("sav_expenses_v1", JSON.stringify(expenses)); } catch {} }, [expenses]);
 
-  const goals    = useMemo(() => { try { const s = localStorage.getItem("goals_v1"); return s ? JSON.parse(s) : []; } catch { return []; } }, []);
-  const fxUsdSgd = useMemo(() => parseFloat(localStorage.getItem("fx_usd_sgd") || "1.35"), []);
-  const fxMyrSgd = useMemo(() => parseFloat(localStorage.getItem("fx_myr_sgd") || "0.30"), []);
+  const [goals,    setGoals]    = useState(() => { try { const s = localStorage.getItem("goals_v1"); return s ? JSON.parse(s) : []; } catch { return []; } });
+  const [fxUsdSgd, setFxUsdSgd] = useState(() => parseFloat(localStorage.getItem("fx_usd_sgd") || "1.35"));
+  const [fxMyrSgd, setFxMyrSgd] = useState(() => parseFloat(localStorage.getItem("fx_myr_sgd") || "0.30"));
+
+  // Keep FX rates and goals in sync when another tab updates them.
+  useEffect(() => {
+    function onStorage(e) {
+      if (e.key === "fx_usd_sgd") setFxUsdSgd(parseFloat(e.newValue || "1.35"));
+      if (e.key === "fx_myr_sgd") setFxMyrSgd(parseFloat(e.newValue || "0.30"));
+      if (e.key === "goals_v1")   { try { setGoals(e.newValue ? JSON.parse(e.newValue) : []); } catch {} }
+    }
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   const totalIncome    = takeHome + otherIncome;
   const totalExpenses  = useMemo(() => expenses.reduce((s, e) => s + (parseFloat(e.amount) || 0), 0), [expenses]);

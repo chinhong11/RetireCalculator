@@ -22,13 +22,15 @@ export default function NetWorthTab({ projectionData, yearsToProject }) {
       .catch(() => setFxStatus("error"));
   }, []);
 
-  const stockHoldings  = useMemo(() => { try { const s = localStorage.getItem("stocks_v1");   return s ? JSON.parse(s) : []; } catch { return []; } }, []);
-  const cryptoHoldings = useMemo(() => { try { const s = localStorage.getItem("crypto_v1");   return s ? JSON.parse(s) : []; } catch { return []; } }, []);
-  const myStocks       = useMemo(() => { try { const s = localStorage.getItem("mystocks_v1"); return s ? JSON.parse(s) : []; } catch { return []; } }, []);
-  const properties     = useMemo(() => { try { const s = localStorage.getItem("hl_props_v1"); return s ? JSON.parse(s) : []; } catch { return []; } }, []);
-  const fdList         = useMemo(() => { try { const s = localStorage.getItem("fd_v1");       return s ? JSON.parse(s) : []; } catch { return []; } }, []);
+  const readLS = (key, fallback = []) => { try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : fallback; } catch { return fallback; } };
 
-  const epfSettings = useMemo(() => ({
+  const [stockHoldings,  setStockHoldings]  = useState(() => readLS("stocks_v1"));
+  const [cryptoHoldings, setCryptoHoldings] = useState(() => readLS("crypto_v1"));
+  const [myStocks,       setMyStocks]       = useState(() => readLS("mystocks_v1"));
+  const [properties,     setProperties]     = useState(() => readLS("hl_props_v1"));
+  const [fdList,         setFdList]         = useState(() => readLS("fd_v1"));
+
+  const readEpf = () => ({
     wage:      parseFloat(localStorage.getItem("epf_wage")        || "0"),
     age:       parseInt(localStorage.getItem("epf_age")           || "30"),
     increment: parseFloat(localStorage.getItem("epf_increment")   || "3"),
@@ -36,7 +38,38 @@ export default function NetWorthTab({ projectionData, yearsToProject }) {
     startPer:  parseFloat(localStorage.getItem("epf_per_start")   || "0"),
     startSej:  parseFloat(localStorage.getItem("epf_sej_start")   || "0"),
     startFlek: parseFloat(localStorage.getItem("epf_flek_start")  || "0"),
-  }), []);
+  });
+  const [epfSettings, setEpfSettings] = useState(readEpf);
+
+  // Price caches — written by portfolio tabs, read here. A storage event fires
+  // when another tab (or window) writes to localStorage, keeping this in sync.
+  const [stockPrices,   setStockPrices]   = useState(() => readLS("stocks_prices_v1",   {}));
+  const [cryptoPrices,  setCryptoPrices]  = useState(() => readLS("crypto_prices_v1",   {}));
+  const [myStockPrices, setMyStockPrices] = useState(() => readLS("mystocks_prices_v1", {}));
+
+  useEffect(() => {
+    const HANDLERS = {
+      "stocks_v1":          v => setStockHoldings(v ?? []),
+      "crypto_v1":          v => setCryptoHoldings(v ?? []),
+      "mystocks_v1":        v => setMyStocks(v ?? []),
+      "hl_props_v1":        v => setProperties(v ?? []),
+      "fd_v1":              v => setFdList(v ?? []),
+      "stocks_prices_v1":   v => setStockPrices(v ?? {}),
+      "crypto_prices_v1":   v => setCryptoPrices(v ?? {}),
+      "mystocks_prices_v1": v => setMyStockPrices(v ?? {}),
+      "epf_wage":           () => setEpfSettings(readEpf()),
+      "epf_age":            () => setEpfSettings(readEpf()),
+      "epf_increment":      () => setEpfSettings(readEpf()),
+      "epf_dividend":       () => setEpfSettings(readEpf()),
+    };
+    function onStorage(e) {
+      const handler = HANDLERS[e.key];
+      if (!handler) return;
+      try { handler(e.newValue ? JSON.parse(e.newValue) : null); } catch {}
+    }
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, []);
 
   const epfProjection = useMemo(() => {
     if (!epfSettings.wage || yearsToProject < 1) return [];
@@ -48,10 +81,6 @@ export default function NetWorthTab({ projectionData, yearsToProject }) {
     });
   }, [epfSettings, yearsToProject]);
 
-  // Live price caches written by portfolio tabs when prices are fetched
-  const stockPrices   = useMemo(() => { try { return JSON.parse(localStorage.getItem("stocks_prices_v1")   || "{}"); } catch { return {}; } }, []);
-  const cryptoPrices  = useMemo(() => { try { return JSON.parse(localStorage.getItem("crypto_prices_v1")   || "{}"); } catch { return {}; } }, []);
-  const myStockPrices = useMemo(() => { try { return JSON.parse(localStorage.getItem("mystocks_prices_v1") || "{}"); } catch { return {}; } }, []);
 
   // Per-holding market value: live price × qty when available, cost basis otherwise
   const stocksValue  = stockHoldings.reduce((s, h) => {
