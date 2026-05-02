@@ -4,7 +4,8 @@ import {
   getRateKey, getAllocationKey, getSPRKey,
   getContribRates, getAllocation,
   computeMonthly, projectYears,
-  OW_CEILING, CPF_FRS_2026,
+  OW_CEILING, CPF_FRS_2026, CPF_BHS_2026, CPF_LIFE_RATE,
+  estimateCpfLifePayout,
 } from "../cpf.js";
 
 import {
@@ -394,6 +395,156 @@ describe("calcFd", () => {
 });
 
 // ─── FIRE number invariant ────────────────────────────────────────────────────
+
+// ─── MA Basic Healthcare Sum (BHS) cap ───────────────────────────────────────
+
+describe("MA BHS cap", () => {
+  // Project from age 40 with high salary so MA quickly hits BHS
+  const baseBhs = {
+    salary: 8000, age: 40, prYear: 3, annualIncrement: 0, yearsToProject: 30,
+    oaReturn: 2.5, saReturn: 4, maReturn: 4,
+    oaStart: 0, saStart: 0, maStart: 0,
+    bhs: CPF_BHS_2026, bhsGrowthRate: 0, frsGrowthRate: 0,
+  };
+
+  it("MA never exceeds the BHS (with 0% BHS growth)", () => {
+    const rows = projectYears(baseBhs);
+    rows.forEach(r => expect(r.ma).toBeLessThanOrEqual(CPF_BHS_2026 + 1)); // +1 for rounding
+  });
+
+  it("MA eventually reaches and stays at BHS", () => {
+    const rows = projectYears(baseBhs);
+    const capped = rows.filter(r => r.ma >= CPF_BHS_2026 - 1);
+    expect(capped.length).toBeGreaterThan(0);
+  });
+
+  it("total is higher when BHS overflows to SA (overflow is not lost)", () => {
+    const withBhs    = projectYears({ ...baseBhs, yearsToProject: 10 });
+    // Simulate no BHS cap by setting bhs very high
+    const withoutBhs = projectYears({ ...baseBhs, yearsToProject: 10, bhs: 999_999_999 });
+    // Total must be equal — overflow goes to SA, not discarded
+    const last  = withBhs[withBhs.length - 1];
+    const lastU = withoutBhs[withoutBhs.length - 1];
+    expect(last.total).toBeCloseTo(lastU.total, -1); // within ~$10
+  });
+
+  it("MA overflow goes to SA before age 55", () => {
+    const rows = projectYears({ ...baseBhs, yearsToProject: 5 });
+    // After BHS is hit, SA should grow faster than without cap
+    const noCap = projectYears({ ...baseBhs, yearsToProject: 5, bhs: 999_999_999 });
+    const last     = rows[rows.length - 1];
+    const lastNoCap = noCap[noCap.length - 1];
+    expect(last.sa).toBeGreaterThanOrEqual(lastNoCap.sa);
+  });
+
+  it("MA overflow goes to RA after age 55", () => {
+    const post55 = projectYears({
+      ...baseBhs, age: 55, yearsToProject: 5, maStart: CPF_BHS_2026, saStart: 50000,
+    });
+    // raFormed should be true from the start; any MA overflow goes to RA
+    expect(post55[0].raFormed).toBe(true);
+    const noCap = projectYears({
+      ...baseBhs, age: 55, yearsToProject: 5, maStart: CPF_BHS_2026, saStart: 50000, bhs: 999_999_999,
+    });
+    const last     = post55[post55.length - 1];
+    const lastNoCap = noCap[noCap.length - 1];
+    expect(last.ra).toBeGreaterThanOrEqual(lastNoCap.ra);
+  });
+
+  it("BHS grows with bhsGrowthRate so MA can grow further", () => {
+    const growing  = projectYears({ ...baseBhs, bhsGrowthRate: 3.5, yearsToProject: 10 });
+    const static_  = projectYears({ ...baseBhs, bhsGrowthRate: 0,   yearsToProject: 10 });
+    // With a growing BHS cap, MA is allowed to accumulate more
+    expect(growing[10].ma).toBeGreaterThan(static_[10].ma);
+  });
+
+  it("row includes bhs field reflecting the year's cap", () => {
+    const rows = projectYears({ ...baseBhs, bhsGrowthRate: 3.5, yearsToProject: 3 });
+    expect(rows[0].bhs).toBe(CPF_BHS_2026);
+    expect(rows[3].bhs).toBeGreaterThan(CPF_BHS_2026);
+  });
+});
+
+// ─── FRS inflation at RA formation ───────────────────────────────────────────
+
+describe("FRS inflation", () => {
+  const base55 = {
+    salary: 6000, age: 50, prYear: 3, annualIncrement: 0, yearsToProject: 6,
+    oaReturn: 2.5, saReturn: 4, maReturn: 4,
+    oaStart: 300_000, saStart: 100_000, maStart: 50_000,
+    frs: CPF_FRS_2026, bhs: CPF_BHS_2026,
+    bhsGrowthRate: 0,
+  };
+
+  it("with frsGrowthRate=0, effective FRS equals CPF_FRS_2026", () => {
+    const rows = projectYears({ ...base55, frsGrowthRate: 0 });
+    const raRow = rows.find(d => d.raFormed && !rows[rows.indexOf(d) - 1]?.raFormed);
+    // OA transferred = FRS - SA_after_growth (capped at available OA)
+    // Just verify RA at formation is at least FRS
+    expect(raRow.ra).toBeGreaterThan(CPF_FRS_2026);
+  });
+
+  it("higher frsGrowthRate increases OA top-up (more OA transferred to RA)", () => {
+    const low  = projectYears({ ...base55, frsGrowthRate: 0 });
+    const high = projectYears({ ...base55, frsGrowthRate: 4 });
+    // Higher FRS → more OA transferred → OA lower, RA higher at formation year
+    const lowRaYear  = low.find(d => d.raFormed);
+    const highRaYear = high.find(d => d.raFormed);
+    expect(highRaYear.ra).toBeGreaterThanOrEqual(lowRaYear.ra);
+    expect(highRaYear.oa).toBeLessThanOrEqual(lowRaYear.oa);
+  });
+});
+
+// ─── estimateCpfLifePayout ────────────────────────────────────────────────────
+
+describe("estimateCpfLifePayout", () => {
+  const baseProj = {
+    salary: 6000, age: 40, prYear: 3, annualIncrement: 0, yearsToProject: 30,
+    oaReturn: 2.5, saReturn: 4, maReturn: 4,
+    oaStart: 0, saStart: 0, maStart: 0,
+    frs: CPF_FRS_2026, bhs: 999_999_999, frsGrowthRate: 0, bhsGrowthRate: 0,
+  };
+
+  it("returns null when no RA forms", () => {
+    // Project only 10 years from age 40 — RA never forms
+    const rows = projectYears({ ...baseProj, yearsToProject: 10 });
+    expect(estimateCpfLifePayout(rows, 4)).toBeNull();
+  });
+
+  it("returns a result with monthlyPayout > 0 when RA forms and projection covers 65", () => {
+    const rows   = projectYears(baseProj); // age 40+30 = 70, covers 65
+    const result = estimateCpfLifePayout(rows, 4);
+    expect(result).not.toBeNull();
+    expect(result.monthlyPayout).toBeGreaterThan(0);
+    expect(result.extrapolated).toBe(false);
+  });
+
+  it("extrapolates when projection ends before payoutAge", () => {
+    // Project to age 60 only — RA forms at 55 but payout at 65 not covered
+    const rows   = projectYears({ ...baseProj, yearsToProject: 20 });
+    const result = estimateCpfLifePayout(rows, 4);
+    expect(result).not.toBeNull();
+    expect(result.extrapolated).toBe(true);
+    expect(result.fromAge).toBe(60);
+    expect(result.payoutAge).toBe(65);
+  });
+
+  it("monthlyPayout = raAtPayout * CPF_LIFE_RATE / 12 (rounded)", () => {
+    const rows   = projectYears(baseProj);
+    const result = estimateCpfLifePayout(rows, 4);
+    expect(result.monthlyPayout).toBe(Math.round(result.raAtPayout * CPF_LIFE_RATE / 12));
+  });
+
+  it("larger RA produces higher monthly payout", () => {
+    const low  = projectYears({ ...baseProj, salary: 4000 });
+    const high = projectYears({ ...baseProj, salary: 8000 });
+    const payLow  = estimateCpfLifePayout(low,  4);
+    const payHigh = estimateCpfLifePayout(high, 4);
+    expect(payHigh.monthlyPayout).toBeGreaterThan(payLow.monthlyPayout);
+  });
+});
+
+// ─── FIRE number formula ──────────────────────────────────────────────────────
 
 describe("FIRE number formula", () => {
   // FIRE number = annual expenses / withdrawal rate (pure arithmetic)

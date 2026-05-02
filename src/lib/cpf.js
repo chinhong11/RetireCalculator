@@ -36,9 +36,16 @@ export const ALLOCATION_RATIOS = {
 
 export const OW_CEILING = 8000;
 
-// Full Retirement Sum effective 2026. The RA is seeded from SA (+ OA top-up)
-// up to this cap when the member turns 55. The FRS rises ~3-5% annually.
+// Full Retirement Sum (2026). RA is seeded from SA + OA top-up at age 55.
+// Rises ~3-5% annually — use frsGrowthRate to project the future FRS.
 export const CPF_FRS_2026 = 213_000;
+
+// Basic Healthcare Sum (2026). MA contributions/interest above this cap
+// overflow to SA (before 55) or RA (55+). Also rises annually.
+export const CPF_BHS_2026 = 71_500;
+
+// CPF LIFE Standard Plan approximate annual payout rate on RA at payout age.
+export const CPF_LIFE_RATE = 0.063;
 
 export function getRateKey(age) {
   if (age <= 55) return "55";
@@ -107,44 +114,59 @@ export function projectYears({
   oaReturn, saReturn, maReturn,
   oaStart = 0, saStart = 0, maStart = 0,
   frs = CPF_FRS_2026,
+  bhs = CPF_BHS_2026,
+  frsGrowthRate = 3.5,
+  bhsGrowthRate = 3.5,
 }) {
   const data = [];
 
-  // If the user is already 55+, treat saStart as their current RA balance.
-  let raFormed    = age >= 55;
-  let oaBalance   = oaStart;
-  let saBalance   = raFormed ? 0      : saStart;
-  let raBalance   = raFormed ? saStart : 0;
-  let maBalance   = maStart;
+  // If already 55+, saStart is the current RA balance.
+  let raFormed  = age >= 55;
+  let oaBalance = oaStart;
+  let saBalance = raFormed ? 0       : saStart;
+  let raBalance = raFormed ? saStart : 0;
+  // Cap initial MA at today's BHS (any excess overflowed in the past already).
+  let maBalance = Math.min(maStart, bhs);
 
   let currentSalary  = salary;
   let currentAge     = age;
   let currentPRYear  = prYear;
 
   for (let y = 0; y <= yearsToProject; y++) {
+    // BHS and FRS for year y (grown y years from the 2026 base values).
+    const currentBhs = Math.round(bhs * Math.pow(1 + bhsGrowthRate / 100, y));
+
     if (y > 0) {
-      // 1. Base interest (at the age carried over from the previous year)
+      // 1. Base interest
       oaBalance *= (1 + oaReturn / 100);
-      if (raFormed) raBalance *= (1 + saReturn / 100); // RA earns the configured SA rate
+      if (raFormed) raBalance *= (1 + saReturn / 100);
       else          saBalance *= (1 + saReturn / 100);
       maBalance *= (1 + maReturn / 100);
+
+      // MA interest overflow → SA/RA
+      if (maBalance > currentBhs) {
+        const ov = maBalance - currentBhs;
+        maBalance = currentBhs;
+        if (raFormed) raBalance += ov; else saBalance += ov;
+      }
 
       // 2. Advance age/salary
       currentSalary = currentSalary * (1 + annualIncrement / 100);
       currentAge    += 1;
       currentPRYear += 1;
 
-      // 3. RA formation at 55: SA transferred in full, OA tops up to FRS
+      // 3. RA formation at 55: SA fully transferred, OA tops up to inflation-adjusted FRS
       if (!raFormed && currentAge >= 55) {
         raFormed  = true;
         raBalance = saBalance;
         saBalance = 0;
-        const topUp = Math.min(oaBalance, Math.max(0, frs - raBalance));
+        const effectiveFrs = Math.round(frs * Math.pow(1 + frsGrowthRate / 100, y));
+        const topUp = Math.min(oaBalance, Math.max(0, effectiveFrs - raBalance));
         raBalance  += topUp;
         oaBalance  -= topUp;
       }
 
-      // 4. Extra CPF interest (OA capped at $20k towards threshold)
+      // 4. Extra CPF interest (OA capped at $20k towards combined threshold)
       const oaCapped = Math.min(oaBalance, 20000);
       const combined = oaCapped + (raFormed ? raBalance : saBalance) + maBalance;
       let extra = 0;
@@ -162,10 +184,16 @@ export function projectYears({
     const monthly = computeMonthly(currentSalary, currentAge, currentPRYear);
     if (y > 0) {
       oaBalance += monthly.oaAmount * 12;
-      // After RA formation the allocation that would go to SA goes to RA instead
       if (raFormed) raBalance += monthly.saAmount * 12;
       else          saBalance += monthly.saAmount * 12;
       maBalance += monthly.maAmount * 12;
+
+      // MA contribution overflow → SA/RA
+      if (maBalance > currentBhs) {
+        const ov = maBalance - currentBhs;
+        maBalance = currentBhs;
+        if (raFormed) raBalance += ov; else saBalance += ov;
+      }
     }
 
     data.push({
@@ -173,9 +201,10 @@ export function projectYears({
       age: currentAge, prYear: currentPRYear,
       salary: Math.round(currentSalary),
       oa: Math.round(oaBalance),
-      sa: Math.round(saBalance),  // 0 once raFormed
-      ra: Math.round(raBalance),  // 0 before raFormed
+      sa: Math.round(saBalance),   // 0 once raFormed
+      ra: Math.round(raBalance),   // 0 before raFormed
       ma: Math.round(maBalance),
+      bhs: currentBhs,
       total: Math.round(oaBalance + saBalance + raBalance + maBalance),
       raFormed,
       monthlyContrib: monthly.totalContrib,
@@ -184,6 +213,38 @@ export function projectYears({
     });
   }
   return data;
+}
+
+// Estimate CPF LIFE Standard Plan monthly payout.
+// Finds RA at payoutAge from projectionData; if the projection ends before
+// payoutAge, extrapolates with interest only (conservative — no contributions).
+export function estimateCpfLifePayout(projectionData, saReturnPct, payoutAge = 65) {
+  if (!projectionData?.length) return null;
+  const last = projectionData[projectionData.length - 1];
+
+  // RA must form at some point for CPF LIFE to apply.
+  if (!projectionData.some(d => d.raFormed)) return null;
+
+  let raAtPayout, extrapolated = false, fromAge = null;
+
+  const exactRow = projectionData.find(d => d.age === payoutAge && d.raFormed);
+  if (exactRow) {
+    raAtPayout = exactRow.ra;
+  } else if (last.raFormed && last.age < payoutAge) {
+    // Projection ends before 65 — grow RA forward with interest, no new contributions
+    extrapolated = true;
+    fromAge      = last.age;
+    raAtPayout   = Math.round(last.ra * Math.pow(1 + saReturnPct / 100, payoutAge - last.age));
+  } else if (last.raFormed && last.age > payoutAge) {
+    // Projection reaches past 65 — find the age-65 row
+    const row65 = projectionData.slice().reverse().find(d => d.age <= payoutAge && d.raFormed);
+    raAtPayout = row65 ? row65.ra : last.ra;
+  } else {
+    return null;
+  }
+
+  const monthlyPayout = Math.round(raAtPayout * CPF_LIFE_RATE / 12);
+  return { raAtPayout, monthlyPayout, extrapolated, fromAge, payoutAge };
 }
 
 export const fmt  = (n) => n.toLocaleString("en-SG", { maximumFractionDigits: 0 });

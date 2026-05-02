@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
-import { OW_CEILING, CPF_FRS_2026, computeMonthly, projectYears, fmt, fmtD } from "./lib/cpf.js";
+import { OW_CEILING, CPF_FRS_2026, CPF_BHS_2026, computeMonthly, projectYears, estimateCpfLifePayout, fmt, fmtD } from "./lib/cpf.js";
 
 import { SliderInput }    from "./components/shared/SliderInput.jsx";
 import { StatCard }       from "./components/shared/StatCard.jsx";
@@ -32,19 +32,23 @@ export default function CPFCalculator() {
   const [oaStart, setOaStart] = useState(() => { try { return parseFloat(localStorage.getItem("cpf_oa_start") || "0") || 0; } catch { return 0; } });
   const [saStart, setSaStart] = useState(() => { try { return parseFloat(localStorage.getItem("cpf_sa_start") || "0") || 0; } catch { return 0; } });
   const [maStart, setMaStart] = useState(() => { try { return parseFloat(localStorage.getItem("cpf_ma_start") || "0") || 0; } catch { return 0; } });
+  const [ceilingGrowth, setCeilingGrowth] = useState(() => { try { return parseFloat(localStorage.getItem("cpf_ceiling_growth") || "3.5") || 3.5; } catch { return 3.5; } });
   const [activeTab, setActiveTab] = useState(() => localStorage.getItem("active_tab") || "summary");
   useEffect(() => { try { localStorage.setItem("active_tab", activeTab); } catch {} }, [activeTab]);
 
-  useEffect(() => { try { localStorage.setItem("cpf_oa_start", oaStart); } catch {} }, [oaStart]);
-  useEffect(() => { try { localStorage.setItem("cpf_sa_start", saStart); } catch {} }, [saStart]);
-  useEffect(() => { try { localStorage.setItem("cpf_ma_start", maStart); } catch {} }, [maStart]);
+  useEffect(() => { try { localStorage.setItem("cpf_oa_start",       oaStart);       } catch {} }, [oaStart]);
+  useEffect(() => { try { localStorage.setItem("cpf_sa_start",       saStart);       } catch {} }, [saStart]);
+  useEffect(() => { try { localStorage.setItem("cpf_ma_start",       maStart);       } catch {} }, [maStart]);
+  useEffect(() => { try { localStorage.setItem("cpf_ceiling_growth", ceilingGrowth); } catch {} }, [ceilingGrowth]);
 
   const monthly = useMemo(() => computeMonthly(salary, age, prYear), [salary, age, prYear]);
   const projectionData = useMemo(() => projectYears({
-    salary, age, prYear, annualIncrement, yearsToProject, oaReturn, saReturn, maReturn, oaStart, saStart, maStart
-  }), [salary, age, prYear, annualIncrement, yearsToProject, oaReturn, saReturn, maReturn, oaStart, saStart, maStart]);
+    salary, age, prYear, annualIncrement, yearsToProject, oaReturn, saReturn, maReturn, oaStart, saStart, maStart,
+    frsGrowthRate: ceilingGrowth, bhsGrowthRate: ceilingGrowth,
+  }), [salary, age, prYear, annualIncrement, yearsToProject, oaReturn, saReturn, maReturn, oaStart, saStart, maStart, ceilingGrowth]);
 
-  const finalData = projectionData[projectionData.length - 1];
+  const finalData      = projectionData[projectionData.length - 1];
+  const cpfLifePayout  = useMemo(() => estimateCpfLifePayout(projectionData, saReturn), [projectionData, saReturn]);
 
   return (
     <div style={{
@@ -162,6 +166,7 @@ export default function CPFCalculator() {
               <SliderInput label="OA Return Rate"          value={oaReturn}        onChange={setOaReturn}        min={0} max={8}  step={0.5} suffix="%" />
               <SliderInput label="SA / RA Return Rate"      value={saReturn}        onChange={setSaReturn}        min={0} max={8}  step={0.5} suffix="%" />
               <SliderInput label="MA Return Rate"          value={maReturn}        onChange={setMaReturn}        min={0} max={8}  step={0.5} suffix="%" />
+              <SliderInput label="FRS / BHS Annual Growth" value={ceilingGrowth}   onChange={setCeilingGrowth}   min={0} max={6}  step={0.5} suffix="%" />
             </div>
             <div style={{ background: "var(--card-bg)", borderRadius: 16, padding: 24, border: "1px solid var(--border)" }}>
               <div className="section-title">Current CPF Balances (optional)</div>
@@ -299,10 +304,32 @@ export default function CPFCalculator() {
                 <Area type="monotone" dataKey="ma" stackId="1" stroke="#f472b6" fill="url(#gMA)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
-            {projectionData.some(d => d.raFormed) && (
-              <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.2)", fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
-                <span style={{ color: "#a78bfa", fontWeight: 600 }}>RA formed at age 55</span>
-                {" "}— SA balance transferred to Retirement Account; OA topped up to FRS ({fmtD(CPF_FRS_2026)}). Future SA-allocation contributions go to RA. FRS figure is the 2026 value.
+            {projectionData.some(d => d.raFormed) && (() => {
+              const raYear = projectionData.find(d => d.raFormed);
+              const effectiveFrs = raYear ? fmtD(Math.round(CPF_FRS_2026 * Math.pow(1 + ceilingGrowth / 100, raYear.year))) : fmtD(CPF_FRS_2026);
+              return (
+                <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.2)", fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
+                  <span style={{ color: "#a78bfa", fontWeight: 600 }}>RA formed at age 55</span>
+                  {" "}— SA transferred to Retirement Account; OA topped up to projected FRS of {effectiveFrs} ({ceilingGrowth}%/yr growth from {fmtD(CPF_FRS_2026)}). Future SA-allocation contributions go to RA.
+                </div>
+              );
+            })()}
+            {projectionData.some(d => d.ma >= d.bhs) && (
+              <div style={{ marginTop: 10, padding: "10px 14px", borderRadius: 8, background: "rgba(244,114,182,0.05)", border: "1px solid rgba(244,114,182,0.15)", fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
+                <span style={{ color: "#f472b6", fontWeight: 600 }}>MA reaches BHS cap</span>
+                {" "}— excess contributions and interest redirect to SA / RA. BHS starts at {fmtD(CPF_BHS_2026)} and grows at {ceilingGrowth}%/yr in this projection.
+              </div>
+            )}
+            {cpfLifePayout && (
+              <div style={{ marginTop: 10, padding: "12px 16px", borderRadius: 8, background: "rgba(110,231,183,0.06)", border: "1px solid rgba(110,231,183,0.2)", fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 8 }}>
+                  <span>
+                    <span style={{ color: "var(--accent)", fontWeight: 600 }}>Est. CPF LIFE payout at age {cpfLifePayout.payoutAge}</span>
+                    {" "}(Standard Plan{cpfLifePayout.extrapolated ? `, RA extrapolated from age ${cpfLifePayout.fromAge} at ${saReturn}% — no further contributions assumed` : ""})
+                  </span>
+                  <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 800, color: "var(--accent)", fontSize: 15 }}>~{fmtD(cpfLifePayout.monthlyPayout)}/mo</span>
+                </div>
+                <div style={{ marginTop: 4, fontSize: 11 }}>Based on projected RA of {fmtD(cpfLifePayout.raAtPayout)} · ~6.3% annual rate · verify at cpf.gov.sg/cpflife</div>
               </div>
             )}
           </div>
@@ -367,18 +394,19 @@ export default function CPFCalculator() {
             ? <StatCard label={`RA Balance (Yr ${yearsToProject})`} value={fmtD(finalData.ra)} color="#a78bfa" sub={`at ${saReturn}% return`} />
             : <StatCard label={`SA Balance (Yr ${yearsToProject})`} value={fmtD(finalData.sa)} color="#818cf8" sub={`at ${saReturn}% return`} />
           }
-          <StatCard label={`MA Balance (Yr ${yearsToProject})`} value={fmtD(finalData.ma)} color="#f472b6" sub={`at ${maReturn}% return`} />
+          <StatCard label={`MA Balance (Yr ${yearsToProject})`} value={fmtD(finalData.ma)} color="#f472b6" sub={finalData.ma >= finalData.bhs ? `BHS cap: ${fmtD(finalData.bhs)}` : `at ${maReturn}% return`} />
+          {cpfLifePayout && <StatCard label="Est. CPF LIFE payout" value={`~${fmtD(cpfLifePayout.monthlyPayout)}/mo`} color="var(--accent)" sub={`Standard Plan · age ${cpfLifePayout.payoutAge}`} />}
         </div>
 
         {/* Footer */}
         <div style={{ padding: "16px 20px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7 }}>
           <strong style={{ color: "var(--label)" }}>Disclaimer:</strong> This calculator is for estimation purposes only.
-          Rates are based on CPF Board's official tables effective 1 Jan 2026.
-          OW ceiling is $8,000/month. Actual contributions may vary due to Additional Wages, bonus months,
-          annual salary ceiling ($102,000), and rounding rules. Interest uses simplified annual compounding and includes
-          the extra 1% on the first $60K of combined balances (OA capped at $20K), and for age 55+ the extra 2% on
-          first $30K and extra 1% on next $30K. Extra interest is credited to SA.
-          Always refer to <span style={{ color: "var(--accent)" }}>cpf.gov.sg</span> for official calculations.
+          Rates are based on CPF Board's official tables effective 1 Jan 2026. OW ceiling $8,000/month.
+          MA is capped at the Basic Healthcare Sum (BHS, {fmtD(CPF_BHS_2026)} in 2026); excess overflows to SA/RA.
+          At 55, SA + OA top-up are transferred to RA up to the Full Retirement Sum (FRS, {fmtD(CPF_FRS_2026)} in 2026).
+          Both ceilings are projected forward using the FRS/BHS Growth Rate slider.
+          CPF LIFE payout is a rough estimate for the Standard Plan at ~6.3%/yr of RA at 65.
+          Always verify at <span style={{ color: "var(--accent)" }}>cpf.gov.sg</span>.
         </div>
       </div>
     </div>
