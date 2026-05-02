@@ -4,7 +4,7 @@ import {
   getRateKey, getAllocationKey, getSPRKey,
   getContribRates, getAllocation,
   computeMonthly, projectYears,
-  OW_CEILING,
+  OW_CEILING, CPF_FRS_2026,
 } from "../cpf.js";
 
 import {
@@ -161,9 +161,9 @@ describe("projectYears", () => {
     expect(rows[1].total).toBeGreaterThanOrEqual(m.totalContrib * 12);
   });
 
-  it("OA+SA+MA equals total for every row (within 2 due to per-account rounding)", () => {
+  it("OA+SA+RA+MA equals total for every row (within 2 due to per-account rounding)", () => {
     const rows = projectYears({ ...base, yearsToProject: 5 });
-    rows.forEach(r => expect(Math.abs(r.oa + r.sa + r.ma - r.total)).toBeLessThanOrEqual(2));
+    rows.forEach(r => expect(Math.abs(r.oa + r.sa + r.ra + r.ma - r.total)).toBeLessThanOrEqual(2));
   });
 
   it("age increments by 1 each year", () => {
@@ -176,6 +176,82 @@ describe("projectYears", () => {
   it("balances grow even with 0% return (contributions-only growth)", () => {
     const rows = projectYears({ ...base, oaReturn: 0, saReturn: 0, maReturn: 0, yearsToProject: 3 });
     expect(rows[3].total).toBeGreaterThan(rows[2].total);
+  });
+});
+
+// ─── RA formation at 55 ───────────────────────────────────────────────────────
+
+describe("RA formation at age 55", () => {
+  // Start at 54, project 2 years so age goes 54 → 55 → 56
+  const base55 = {
+    salary: 6000, age: 54, prYear: 3, annualIncrement: 0, yearsToProject: 2,
+    oaReturn: 2.5, saReturn: 4, maReturn: 4,
+    oaStart: 300_000, saStart: 100_000, maStart: 50_000,
+    frs: CPF_FRS_2026,
+  };
+
+  it("raFormed is false at age 54, true at age 55", () => {
+    const rows = projectYears(base55);
+    expect(rows[0].raFormed).toBe(false); // age 54
+    expect(rows[1].raFormed).toBe(true);  // age 55
+    expect(rows[2].raFormed).toBe(true);  // age 56
+  });
+
+  it("SA becomes 0 when RA is formed", () => {
+    const rows = projectYears(base55);
+    expect(rows[0].sa).toBeGreaterThan(0); // SA exists before 55
+    expect(rows[1].sa).toBe(0);            // SA = 0 at 55
+    expect(rows[2].sa).toBe(0);            // SA stays 0 after 55
+  });
+
+  it("RA is 0 before formation, non-zero after", () => {
+    const rows = projectYears(base55);
+    expect(rows[0].ra).toBe(0);           // no RA before 55
+    expect(rows[1].ra).toBeGreaterThan(0); // RA appears at 55
+  });
+
+  it("RA at formation is at least the SA balance (SA fully transferred)", () => {
+    const rows = projectYears(base55);
+    // SA at year 0 grown by one year of interest before the transfer
+    const saAfterGrowth = Math.round(base55.saStart * (1 + base55.saReturn / 100));
+    expect(rows[1].ra).toBeGreaterThanOrEqual(saAfterGrowth);
+  });
+
+  it("RA at end of formation year exceeds FRS (seeded at FRS + year's contributions)", () => {
+    // SA (100k) < FRS (213k) so OA tops up to FRS at the transfer moment.
+    // rows[1].ra then grows further: extra interest + 12 months of SA-allocation contributions.
+    const rows = projectYears(base55);
+    expect(rows[1].ra).toBeGreaterThan(CPF_FRS_2026);
+  });
+
+  it("OA is reduced by the top-up amount at formation", () => {
+    const rows = projectYears(base55);
+    // OA at formation = oaStart * (1+oaReturn) - topUp (plus contributions added AFTER formation)
+    // Just verify OA is strictly less than it would have been without RA
+    const noRa = projectYears({ ...base55, frs: 0 });
+    expect(rows[1].oa).toBeLessThan(noRa[1].oa);
+  });
+
+  it("when SA >= FRS no OA is transferred", () => {
+    // Give SA > FRS: only SA transferred, OA untouched
+    const richSA = { ...base55, saStart: 250_000, frs: CPF_FRS_2026 };
+    const rows = projectYears(richSA);
+    // OA should grow normally without a top-up deduction
+    const noRa = projectYears({ ...richSA, frs: 0 });
+    expect(rows[1].oa).toBe(noRa[1].oa);
+  });
+
+  it("total is continuous across RA formation (no value disappears)", () => {
+    const rows = projectYears(base55);
+    // Total must still grow from year 0 to year 1 (contributions + interest > 0)
+    expect(rows[1].total).toBeGreaterThan(rows[0].total);
+  });
+
+  it("user starting at age 55 has raFormed=true from row 0 (saStart treated as RA)", () => {
+    const rows = projectYears({ ...base55, age: 55 });
+    expect(rows[0].raFormed).toBe(true);
+    expect(rows[0].sa).toBe(0);
+    expect(rows[0].ra).toBe(base55.saStart);
   });
 });
 

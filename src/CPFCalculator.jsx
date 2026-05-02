@@ -1,7 +1,7 @@
 import { useState, useMemo, useEffect } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 
-import { OW_CEILING, computeMonthly, projectYears, fmt, fmtD } from "./lib/cpf.js";
+import { OW_CEILING, CPF_FRS_2026, computeMonthly, projectYears, fmt, fmtD } from "./lib/cpf.js";
 
 import { SliderInput }    from "./components/shared/SliderInput.jsx";
 import { StatCard }       from "./components/shared/StatCard.jsx";
@@ -160,7 +160,7 @@ export default function CPFCalculator() {
               <SliderInput label="Annual Salary Increment" value={annualIncrement} onChange={setAnnualIncrement} min={0} max={15} step={0.5} suffix="%" />
               <SliderInput label="Project Over"            value={yearsToProject}  onChange={setYearsToProject}  min={1} max={40} step={1}   suffix=" years" />
               <SliderInput label="OA Return Rate"          value={oaReturn}        onChange={setOaReturn}        min={0} max={8}  step={0.5} suffix="%" />
-              <SliderInput label="SA Return Rate"          value={saReturn}        onChange={setSaReturn}        min={0} max={8}  step={0.5} suffix="%" />
+              <SliderInput label="SA / RA Return Rate"      value={saReturn}        onChange={setSaReturn}        min={0} max={8}  step={0.5} suffix="%" />
               <SliderInput label="MA Return Rate"          value={maReturn}        onChange={setMaReturn}        min={0} max={8}  step={0.5} suffix="%" />
             </div>
             <div style={{ background: "var(--card-bg)", borderRadius: 16, padding: 24, border: "1px solid var(--border)" }}>
@@ -170,7 +170,7 @@ export default function CPFCalculator() {
               </div>
               {[
                 { label: "OA Balance (S$)", value: oaStart, set: setOaStart, color: "#4ade80" },
-                { label: "SA Balance (S$)", value: saStart, set: setSaStart, color: "#818cf8" },
+                { label: age >= 55 ? "RA Balance (S$)" : "SA Balance (S$)", value: saStart, set: setSaStart, color: age >= 55 ? "#a78bfa" : "#818cf8" },
                 { label: "MA Balance (S$)", value: maStart, set: setMaStart, color: "#f472b6" },
               ].map(({ label, value, set, color }) => (
                 <div key={label} style={{ marginBottom: 14 }}>
@@ -205,7 +205,7 @@ export default function CPFCalculator() {
           </div>
           <div className="section-title" style={{ marginTop: 8 }}>Account Allocation</div>
           <AccountBar label="Ordinary Account (OA)" amount={monthly.oaAmount}  total={monthly.totalContrib} color="#4ade80" />
-          <AccountBar label="Special Account (SA)"  amount={monthly.saAmount}  total={monthly.totalContrib} color="#818cf8" />
+          <AccountBar label={age >= 55 ? "Retirement Account (RA)" : "Special Account (SA)"} amount={monthly.saAmount} total={monthly.totalContrib} color={age >= 55 ? "#a78bfa" : "#818cf8"} />
           <AccountBar label="MediSave Account (MA)" amount={monthly.maAmount}  total={monthly.totalContrib} color="#f472b6" />
           <div style={{
             marginTop: 16, padding: "12px 16px", borderRadius: 10,
@@ -258,9 +258,10 @@ export default function CPFCalculator() {
                   After {yearsToProject} years · Age {finalData.age}
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 16, fontSize: 12 }}>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontSize: 12 }}>
                 <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: "#4ade80" }}></span> OA</span>
                 <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: "#818cf8" }}></span> SA</span>
+                <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: "#a78bfa" }}></span> RA <span style={{ color: "var(--muted)", fontSize: 10 }}>(at 55)</span></span>
                 <span style={{ display: "flex", alignItems: "center", gap: 6 }}><span style={{ width: 10, height: 10, borderRadius: 3, background: "#f472b6" }}></span> MA</span>
               </div>
             </div>
@@ -274,6 +275,10 @@ export default function CPFCalculator() {
                   <linearGradient id="gSA" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#818cf8" stopOpacity={0.4} />
                     <stop offset="100%" stopColor="#818cf8" stopOpacity={0.02} />
+                  </linearGradient>
+                  <linearGradient id="gRA" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stopColor="#a78bfa" stopOpacity={0.4} />
+                    <stop offset="100%" stopColor="#a78bfa" stopOpacity={0.02} />
                   </linearGradient>
                   <linearGradient id="gMA" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#f472b6" stopOpacity={0.4} />
@@ -290,9 +295,16 @@ export default function CPFCalculator() {
                 <Tooltip content={<CustomTooltip />} />
                 <Area type="monotone" dataKey="oa" stackId="1" stroke="#4ade80" fill="url(#gOA)" strokeWidth={2} />
                 <Area type="monotone" dataKey="sa" stackId="1" stroke="#818cf8" fill="url(#gSA)" strokeWidth={2} />
+                <Area type="monotone" dataKey="ra" stackId="1" stroke="#a78bfa" fill="url(#gRA)" strokeWidth={2} />
                 <Area type="monotone" dataKey="ma" stackId="1" stroke="#f472b6" fill="url(#gMA)" strokeWidth={2} />
               </AreaChart>
             </ResponsiveContainer>
+            {projectionData.some(d => d.raFormed) && (
+              <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.2)", fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
+                <span style={{ color: "#a78bfa", fontWeight: 600 }}>RA formed at age 55</span>
+                {" "}— SA balance transferred to Retirement Account; OA topped up to FRS ({fmtD(CPF_FRS_2026)}). Future SA-allocation contributions go to RA. FRS figure is the 2026 value.
+              </div>
+            )}
           </div>
         )}
 
@@ -302,7 +314,7 @@ export default function CPFCalculator() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                    {["Year", "Age", "PR Yr", "Salary", "Monthly", "OA", "SA", "MA", "Total CPF"].map(h => (
+                    {["Year", "Age", "PR Yr", "Salary", "Monthly", "OA", "SA", "RA", "MA", "Total CPF"].map(h => (
                       <th key={h} style={{
                         padding: "14px 12px", textAlign: "right", fontSize: 11, fontWeight: 600,
                         color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em",
@@ -312,19 +324,26 @@ export default function CPFCalculator() {
                   </tr>
                 </thead>
                 <tbody>
-                  {projectionData.map((d, i) => (
-                    <tr key={i} style={{ borderBottom: "1px solid var(--border)", background: i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)" }}>
-                      <td style={{ padding: "12px", textAlign: "right", fontWeight: 600 }}>{d.year}</td>
-                      <td style={{ padding: "12px", textAlign: "right", color: "var(--label)" }}>{d.age}</td>
-                      <td style={{ padding: "12px", textAlign: "right", color: "var(--label)" }}>{d.prYear >= 3 ? "3+" : d.prYear}</td>
-                      <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace" }}>{fmtD(d.salary)}</td>
-                      <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace" }}>{fmtD(d.monthlyContrib)}</td>
-                      <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: "#4ade80" }}>{fmtD(d.oa)}</td>
-                      <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: "#818cf8" }}>{fmtD(d.sa)}</td>
-                      <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: "#f472b6" }}>{fmtD(d.ma)}</td>
-                      <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 700, color: "var(--accent)" }}>{fmtD(d.total)}</td>
-                    </tr>
-                  ))}
+                  {projectionData.map((d, i) => {
+                    const isRaYear = d.raFormed && (i === 0 ? true : !projectionData[i - 1].raFormed);
+                    return (
+                      <tr key={i} style={{ borderBottom: "1px solid var(--border)", background: isRaYear ? "rgba(167,139,250,0.06)" : i % 2 === 0 ? "transparent" : "rgba(255,255,255,0.01)" }}>
+                        <td style={{ padding: "12px", textAlign: "right", fontWeight: 600 }}>
+                          {d.year}
+                          {isRaYear && <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: "#a78bfa", background: "rgba(167,139,250,0.15)", padding: "2px 5px", borderRadius: 4, verticalAlign: "middle" }}>RA</span>}
+                        </td>
+                        <td style={{ padding: "12px", textAlign: "right", color: "var(--label)" }}>{d.age}</td>
+                        <td style={{ padding: "12px", textAlign: "right", color: "var(--label)" }}>{d.prYear >= 3 ? "3+" : d.prYear}</td>
+                        <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace" }}>{fmtD(d.salary)}</td>
+                        <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace" }}>{fmtD(d.monthlyContrib)}</td>
+                        <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: "#4ade80" }}>{fmtD(d.oa)}</td>
+                        <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: "#818cf8" }}>{d.raFormed ? <span style={{ color: "var(--muted)" }}>—</span> : fmtD(d.sa)}</td>
+                        <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: "#a78bfa" }}>{d.raFormed ? fmtD(d.ra) : <span style={{ color: "var(--muted)" }}>—</span>}</td>
+                        <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: "#f472b6" }}>{fmtD(d.ma)}</td>
+                        <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 700, color: "var(--accent)" }}>{fmtD(d.total)}</td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -344,7 +363,10 @@ export default function CPFCalculator() {
         {/* Summary Cards */}
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12, marginBottom: 28 }}>
           <StatCard label={`OA Balance (Yr ${yearsToProject})`} value={fmtD(finalData.oa)} color="#4ade80" sub={`at ${oaReturn}% return`} />
-          <StatCard label={`SA Balance (Yr ${yearsToProject})`} value={fmtD(finalData.sa)} color="#818cf8" sub={`at ${saReturn}% return`} />
+          {finalData.raFormed
+            ? <StatCard label={`RA Balance (Yr ${yearsToProject})`} value={fmtD(finalData.ra)} color="#a78bfa" sub={`at ${saReturn}% return`} />
+            : <StatCard label={`SA Balance (Yr ${yearsToProject})`} value={fmtD(finalData.sa)} color="#818cf8" sub={`at ${saReturn}% return`} />
+          }
           <StatCard label={`MA Balance (Yr ${yearsToProject})`} value={fmtD(finalData.ma)} color="#f472b6" sub={`at ${maReturn}% return`} />
         </div>
 
