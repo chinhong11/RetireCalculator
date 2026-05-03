@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect, useCallback } from "react";
 
 import { OW_CEILING, CPF_FRS_2026, CPF_BHS_2026, computeMonthly, projectYears, estimateCpfLifePayout, fmt, fmtD } from "./lib/cpf.js";
 import { exportCpfPdf } from "./lib/exportPdf.js";
+import { useCloudSync } from "./lib/useCloudSync.js";
 
 import { SliderInput }       from "./components/shared/SliderInput.jsx";
 import { BackupBar }         from "./components/shared/BackupBar.jsx";
@@ -9,6 +10,7 @@ import { ErrorBoundary }     from "./components/shared/ErrorBoundary.jsx";
 import { MonthlyBreakdown }  from "./components/shared/MonthlyBreakdown.jsx";
 import { CpfSummaryCards }   from "./components/shared/CpfSummaryCards.jsx";
 import { Hint }              from "./components/shared/Hint.jsx";
+import { AuthModal }         from "./components/shared/AuthModal.jsx";
 
 import ProjectionTab        from "./components/tabs/ProjectionTab.jsx";
 import ProjectionTableTab   from "./components/tabs/ProjectionTableTab.jsx";
@@ -152,6 +154,11 @@ export default function CPFCalculator() {
   const [advancedOpen, setAdvancedOpen] = useState(false);
   // Show a first-run banner until the user changes salary (key not in storage yet)
   const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem("cpf_salary"));
+  const [showAuthModal, setShowAuthModal] = useState(false);
+  const [syncTrigger, setSyncTrigger] = useState(0);
+
+  // ─── Cloud sync ─────────────────────────────────────────────────────────
+  const { user, syncing, syncError, signOut } = useCloudSync(syncTrigger);
 
   // ─── Persistence ────────────────────────────────────────────────────────
   useEffect(() => { try { localStorage.setItem("active_tab",        activeTab);                  } catch {} }, [activeTab]);
@@ -168,6 +175,12 @@ export default function CPFCalculator() {
   useEffect(() => { try { localStorage.setItem("cpf_ma_start",       maStart);                   } catch {} }, [maStart]);
   useEffect(() => { try { localStorage.setItem("cpf_ceiling_growth", ceilingGrowth);             } catch {} }, [ceilingGrowth]);
   useEffect(() => { try { localStorage.setItem("cpf_sa_shield", saShieldOn ? saShield : 0);      } catch {} }, [saShield, saShieldOn]);
+
+  // Increment syncTrigger whenever any persisted value changes so useCloudSync debounces an outbound write
+  useEffect(() => { setSyncTrigger(n => n + 1); },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [salary, age, prYear, annualIncrement, yearsToProject, oaReturn, saReturn, maReturn,
+     oaStart, saStart, maStart, ceilingGrowth, saShield, saShieldOn]);
 
   // ─── Derived data ────────────────────────────────────────────────────────
   const effectiveSaShield = age < 55 && saShieldOn ? saShield : 0;
@@ -280,6 +293,33 @@ export default function CPFCalculator() {
             <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
               {pdfError && (
                 <span style={{ fontSize: 11, color: "#f87171", fontWeight: 500 }}>⚠ {pdfError}</span>
+              )}
+              {syncError && (
+                <span style={{ fontSize: 11, color: "#fbbf24", fontWeight: 500 }}>⚠ {syncError}</span>
+              )}
+              {/* Cloud sync / auth button */}
+              {user ? (
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  {syncing && (
+                    <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 500 }}>☁ Syncing…</span>
+                  )}
+                  {!syncing && (
+                    <span style={{ fontSize: 11, color: "var(--muted)" }} title={user.email}>
+                      ☁ {user.email.length > 20 ? user.email.slice(0, 18) + "…" : user.email}
+                    </span>
+                  )}
+                  <button
+                    onClick={signOut}
+                    title="Sign out"
+                    style={{ background: "var(--input-bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontSize: 11, fontWeight: 600, color: "var(--muted)" }}
+                  >Sign out</button>
+                </div>
+              ) : (
+                <button
+                  onClick={() => setShowAuthModal(true)}
+                  title="Sign in to sync your data to the cloud"
+                  style={{ background: "var(--accent-subtle)", border: "1px solid var(--accent-border-c)", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--accent)", display: "flex", alignItems: "center", gap: 5 }}
+                >☁ Sign in</button>
               )}
               <button
                 onClick={() => setTheme(t => t === "dark" ? "light" : "dark")}
@@ -626,6 +666,11 @@ export default function CPFCalculator() {
         </div>
 
       </div>
+
+      {/* ── Auth modal ──────────────────────────────────────────────────── */}
+      {showAuthModal && (
+        <AuthModal onClose={() => setShowAuthModal(false)} />
+      )}
     </div>
   );
 }
