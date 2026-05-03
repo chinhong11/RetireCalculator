@@ -488,13 +488,16 @@ export default function CPFCalculator() {
               >{label}</button>
             ))}
 
-            {/* Group separator */}
-            <div aria-hidden="true" style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 4px", flexShrink: 0 }}>
-              <div style={{ width: 1, height: 24, background: "var(--border)" }} />
+            {/* Full-width break + section label before asset tabs */}
+            <div aria-hidden="true" style={{ flexBasis: "100%", height: 4 }} />
+            <div aria-hidden="true" style={{
+              flexBasis: "100%", display: "flex", alignItems: "center", gap: 8, marginBottom: 2,
+            }}>
+              <div style={{ height: 1, flex: 1, background: "var(--border)" }} />
               <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted)", whiteSpace: "nowrap" }}>
                 Assets &amp; Planning
               </span>
-              <div style={{ width: 1, height: 24, background: "var(--border)" }} />
+              <div style={{ height: 1, flex: 1, background: "var(--border)" }} />
             </div>
 
             {ASSET_TABS.map(([id, label]) => (
