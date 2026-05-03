@@ -8,6 +8,7 @@ import { BackupBar }         from "./components/shared/BackupBar.jsx";
 import { ErrorBoundary }     from "./components/shared/ErrorBoundary.jsx";
 import { MonthlyBreakdown }  from "./components/shared/MonthlyBreakdown.jsx";
 import { CpfSummaryCards }   from "./components/shared/CpfSummaryCards.jsx";
+import { Hint }              from "./components/shared/Hint.jsx";
 
 import ProjectionTab        from "./components/tabs/ProjectionTab.jsx";
 import ProjectionTableTab   from "./components/tabs/ProjectionTableTab.jsx";
@@ -87,6 +88,37 @@ const TABS = [
   ["networth",   "💰 Net Worth"],
 ];
 
+const CPF_TABS   = TABS.slice(0, 3);
+const ASSET_TABS = TABS.slice(3);
+
+const GLOSSARY = {
+  OA:         "Ordinary Account — for housing, education, investment.",
+  SA:         "Special Account — retirement savings, earns higher interest.",
+  RA:         "Retirement Account — formed at 55 from OA + SA, funds CPF LIFE.",
+  MA:         "MediSave Account — for approved medical expenses.",
+  FRS:        "Full Retirement Sum — CPF Board's annual RA target amount.",
+  BHS:        "Basic Healthcare Sum — MediSave cap; excess overflows to SA/RA.",
+  "CPFIS-SA": "CPF Investment Scheme (SA) — shields SA from RA transfer at 55.",
+};
+
+// ─── Local components ─────────────────────────────────────────────────────────
+function StepLabel({ n, title, optional }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+      <span style={{
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        width: 20, height: 20, borderRadius: "50%",
+        background: "var(--accent-chip)", border: "1px solid var(--accent-border-c)",
+        fontSize: 11, fontWeight: 700, color: "var(--accent)", flexShrink: 0,
+      }}>{n}</span>
+      <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted)", fontWeight: 600 }}>
+        {title}
+        {optional && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optional)</span>}
+      </span>
+    </div>
+  );
+}
+
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 /** @param {string} key @param {number} fallback @returns {number} */
 function lsFloat(key, fallback) {
@@ -112,18 +144,19 @@ export default function CPFCalculator() {
   const [saStart, setSaStart]   = useState(() => lsFloat("cpf_sa_start",       0));
   const [maStart, setMaStart]   = useState(() => lsFloat("cpf_ma_start",       0));
   const [ceilingGrowth, setCeilingGrowth] = useState(() => lsFloat("cpf_ceiling_growth", 3.5));
-  const [saShield, setSaShield]   = useState(() => lsFloat("cpf_sa_shield", 0));
+  const [saShield, setSaShield]     = useState(() => lsFloat("cpf_sa_shield", 0));
   const [saShieldOn, setSaShieldOn] = useState(() => lsFloat("cpf_sa_shield", 0) > 0);
-  const [activeTab, setActiveTab] = useState(() => localStorage.getItem("active_tab") || "summary");
-  const [pdfBusy, setPdfBusy]     = useState(false);
+  const [activeTab, setActiveTab]   = useState(() => localStorage.getItem("active_tab") || "summary");
+  const [pdfBusy, setPdfBusy]       = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
 
   // ─── Persistence ────────────────────────────────────────────────────────
-  useEffect(() => { try { localStorage.setItem("active_tab",        activeTab);                     } catch {} }, [activeTab]);
-  useEffect(() => { try { localStorage.setItem("cpf_oa_start",       oaStart);                      } catch {} }, [oaStart]);
-  useEffect(() => { try { localStorage.setItem("cpf_sa_start",       saStart);                      } catch {} }, [saStart]);
-  useEffect(() => { try { localStorage.setItem("cpf_ma_start",       maStart);                      } catch {} }, [maStart]);
-  useEffect(() => { try { localStorage.setItem("cpf_ceiling_growth", ceilingGrowth);                } catch {} }, [ceilingGrowth]);
-  useEffect(() => { try { localStorage.setItem("cpf_sa_shield",      saShieldOn ? saShield : 0);    } catch {} }, [saShield, saShieldOn]);
+  useEffect(() => { try { localStorage.setItem("active_tab",        activeTab);                  } catch {} }, [activeTab]);
+  useEffect(() => { try { localStorage.setItem("cpf_oa_start",       oaStart);                   } catch {} }, [oaStart]);
+  useEffect(() => { try { localStorage.setItem("cpf_sa_start",       saStart);                   } catch {} }, [saStart]);
+  useEffect(() => { try { localStorage.setItem("cpf_ma_start",       maStart);                   } catch {} }, [maStart]);
+  useEffect(() => { try { localStorage.setItem("cpf_ceiling_growth", ceilingGrowth);             } catch {} }, [ceilingGrowth]);
+  useEffect(() => { try { localStorage.setItem("cpf_sa_shield", saShieldOn ? saShield : 0);      } catch {} }, [saShield, saShieldOn]);
 
   // ─── Derived data ────────────────────────────────────────────────────────
   const effectiveSaShield = age < 55 && saShieldOn ? saShield : 0;
@@ -150,6 +183,8 @@ export default function CPFCalculator() {
     () => estimateCpfLifePayout(projectionData, saReturn),
     [projectionData, saReturn],
   );
+
+  const advancedSummary = `${yearsToProject} yrs · OA ${oaReturn}% · SA ${saReturn}%`;
 
   const handleExportPdf = useCallback(async () => {
     if (pdfBusy) return;
@@ -194,6 +229,16 @@ export default function CPFCalculator() {
         .hl-in { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font-size: 13px; font-family: inherit; outline: none; transition: border 0.2s; -webkit-appearance: none; appearance: none; }
         .hl-in:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-shadow); }
         .hl-in option { background: var(--option-bg); color: var(--option-color); }
+        .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+        .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
+        .sidebar-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+        .adv-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; background: transparent; border: none; cursor: pointer; padding: 0; font-family: inherit; }
+        .adv-toggle:focus-visible { outline: 2px solid var(--accent); border-radius: 4px; }
+        @media (max-width: 800px) {
+          .layout-grid { grid-template-columns: 1fr !important; }
+          .sidebar-sticky { position: static !important; }
+          .sidebar-scroll { max-height: none !important; overflow-y: visible !important; }
+        }
         @media (max-width: 480px) {
           .tab-btn { padding: 7px 12px; font-size: 12px; }
           .mobile-h1 { font-size: 22px !important; }
@@ -209,7 +254,7 @@ export default function CPFCalculator() {
         borderBottom: "1px solid var(--border)",
         marginBottom: 24,
       }}>
-        <div style={{ maxWidth: 800, margin: "0 auto" }}>
+        <div style={{ maxWidth: 1140, margin: "0 auto" }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
             <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
               <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)" }} />
@@ -243,63 +288,94 @@ export default function CPFCalculator() {
         </div>
       </div>
 
-      <div className="mobile-inner" style={{ maxWidth: 800, margin: "0 auto", padding: "0 20px" }}>
+      {/* ── Two-column layout ───────────────────────────────────────────── */}
+      <div className="layout-grid mobile-inner" style={{
+        maxWidth: 1140, margin: "0 auto", padding: "0 20px",
+        display: "grid", gridTemplateColumns: "340px 1fr",
+        gap: 28, alignItems: "start",
+      }}>
 
-        {/* ── Inputs ──────────────────────────────────────────────────────── */}
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: 20, marginBottom: 28 }}>
+        {/* ════ LEFT SIDEBAR (sticky) ════════════════════════════════════════ */}
+        <div className="sidebar-sticky" style={{ position: "sticky", top: 24 }}>
+          <div className="sidebar-scroll" style={{ maxHeight: "calc(100vh - 48px)", overflowY: "auto", display: "flex", flexDirection: "column", gap: 16, paddingBottom: 8 }}>
 
-          {/* Profile */}
-          <div style={{ background: "var(--card-bg)", borderRadius: 16, padding: 24, border: "1px solid var(--border)" }}>
-            <div className="section-title">Your Profile</div>
-            <div style={{ marginBottom: 18 }}>
-              <label style={{ fontSize: 13, color: "var(--label)", fontWeight: 500, display: "block", marginBottom: 6 }}>Monthly Salary (SGD)</label>
-              <input
-                type="number" className="input-field" value={salary} min={0} step={100}
-                onChange={e => setSalary(Math.max(0, parseInt(e.target.value) || 0))}
-              />
-              {salary > OW_CEILING && (
-                <div style={{ fontSize: 11, color: "#fbbf24", marginTop: 6 }}>
-                  ⚠ Capped at ${fmt(OW_CEILING)} OW ceiling for CPF
+            {/* ① Profile */}
+            <div style={{ background: "var(--card-bg)", borderRadius: 16, padding: 24, border: "1px solid var(--border)" }}>
+              <StepLabel n={1} title="Profile" />
+              <div style={{ marginBottom: 18 }}>
+                <label style={{ fontSize: 13, color: "var(--label)", fontWeight: 500, display: "block", marginBottom: 6 }}>Monthly Salary (SGD)</label>
+                <input
+                  type="number" className="input-field" value={salary} min={0} step={100}
+                  onChange={e => setSalary(Math.max(0, parseInt(e.target.value) || 0))}
+                />
+                {salary > OW_CEILING && (
+                  <div style={{ fontSize: 11, color: "#fbbf24", marginTop: 6 }}>
+                    ⚠ Capped at ${fmt(OW_CEILING)} OW ceiling for CPF
+                  </div>
+                )}
+              </div>
+              <SliderInput label="Age" value={age} onChange={setAge} min={21} max={70} step={1} suffix=" yrs" />
+              <div style={{ marginBottom: 18 }}>
+                <label style={{ fontSize: 13, color: "var(--label)", fontWeight: 500, display: "block", marginBottom: 8 }}>PR Status Year</label>
+                <div style={{ display: "flex", gap: 8 }}>
+                  {[1, 2, 3].map(y => (
+                    <button key={y} className={`pr-chip ${prYear === y ? "selected" : ""}`} onClick={() => setPrYear(y)}>
+                      {y === 3 ? "3rd yr+" : y === 1 ? "1st yr" : "2nd yr"}
+                    </button>
+                  ))}
                 </div>
-              )}
-            </div>
-            <SliderInput label="Age" value={age} onChange={setAge} min={21} max={70} step={1} suffix=" yrs" />
-            <div style={{ marginBottom: 18 }}>
-              <label style={{ fontSize: 13, color: "var(--label)", fontWeight: 500, display: "block", marginBottom: 8 }}>PR Status Year</label>
-              <div style={{ display: "flex", gap: 8 }}>
-                {[1, 2, 3].map(y => (
-                  <button key={y} className={`pr-chip ${prYear === y ? "selected" : ""}`} onClick={() => setPrYear(y)}>
-                    {y === 3 ? "3rd yr+" : y === 1 ? "1st yr" : "2nd yr"}
-                  </button>
-                ))}
               </div>
             </div>
-          </div>
 
-          {/* Projection settings + balances */}
-          <div style={{ display: "flex", flexDirection: "column", gap: 16, flex: "1 1 280px" }}>
+            {/* ② Assumptions (collapsible) */}
             <div style={{ background: "var(--card-bg)", borderRadius: 16, padding: 24, border: "1px solid var(--border)" }}>
-              <div className="section-title">Projection Settings</div>
-              <SliderInput label="Annual Salary Increment" value={annualIncrement} onChange={setAnnualIncrement} min={0} max={15} step={0.5} suffix="%" />
-              <SliderInput label="Project Over"            value={yearsToProject}  onChange={setYearsToProject}  min={1} max={40} step={1}   suffix=" years" />
-              <SliderInput label="OA Return Rate"          value={oaReturn}        onChange={setOaReturn}        min={0} max={8}  step={0.5} suffix="%" />
-              <SliderInput label="SA / RA Return Rate"     value={saReturn}        onChange={setSaReturn}        min={0} max={8}  step={0.5} suffix="%" />
-              <SliderInput label="MA Return Rate"          value={maReturn}        onChange={setMaReturn}        min={0} max={8}  step={0.5} suffix="%" />
-              <SliderInput label="FRS / BHS Annual Growth" value={ceilingGrowth}   onChange={setCeilingGrowth}   min={0} max={6}  step={0.5} suffix="%" />
+              <StepLabel n={2} title="Assumptions" />
+              <button
+                className="adv-toggle"
+                onClick={() => setAdvancedOpen(o => !o)}
+                aria-expanded={advancedOpen}
+              >
+                <span style={{ fontSize: 12, color: "var(--muted)", fontFamily: "'DM Mono', monospace" }}>
+                  {advancedSummary}
+                </span>
+                <span style={{
+                  fontSize: 10, color: "var(--accent)", fontWeight: 600,
+                  border: "1px solid var(--accent-border-c)", borderRadius: 6,
+                  padding: "2px 8px", marginLeft: 8, whiteSpace: "nowrap",
+                }}>
+                  {advancedOpen ? "▲ Less" : "▼ More"}
+                </span>
+              </button>
+              <div style={{
+                overflow: "hidden",
+                maxHeight: advancedOpen ? "600px" : "0px",
+                transition: "max-height 0.3s ease",
+                marginTop: advancedOpen ? 16 : 0,
+              }}>
+                <SliderInput label="Annual Salary Increment" value={annualIncrement} onChange={setAnnualIncrement} min={0} max={15} step={0.5} suffix="%" />
+                <SliderInput label="Project Over"            value={yearsToProject}  onChange={setYearsToProject}  min={1} max={40} step={1}   suffix=" years" />
+                <SliderInput label={<>OA Return Rate <Hint text={GLOSSARY.OA} /></>}          value={oaReturn}      onChange={setOaReturn}      min={0} max={8} step={0.5} suffix="%" />
+                <SliderInput label={<>SA / RA Return Rate <Hint text={GLOSSARY.SA} /></>}     value={saReturn}      onChange={setSaReturn}      min={0} max={8} step={0.5} suffix="%" />
+                <SliderInput label="MA Return Rate"          value={maReturn}        onChange={setMaReturn}        min={0} max={8}  step={0.5} suffix="%" />
+                <SliderInput label={<>FRS / BHS Growth <Hint text={GLOSSARY.FRS} /><Hint text={GLOSSARY.BHS} /></>} value={ceilingGrowth} onChange={setCeilingGrowth} min={0} max={6} step={0.5} suffix="%" />
+              </div>
             </div>
 
+            {/* ③ Starting Balances (optional) */}
             <div style={{ background: "var(--card-bg)", borderRadius: 16, padding: 24, border: "1px solid var(--border)" }}>
-              <div className="section-title">Current CPF Balances (optional)</div>
+              <StepLabel n={3} title="Starting Balances" optional />
               <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 14, lineHeight: 1.6 }}>
                 Enter your actual balances from the CPF portal. The projection will start from these figures instead of $0.
               </div>
               {[
-                { label: "OA Balance (S$)",                              value: oaStart, set: setOaStart, color: "#4ade80" },
-                { label: age >= 55 ? "RA Balance (S$)" : "SA Balance (S$)", value: saStart, set: setSaStart, color: age >= 55 ? "#a78bfa" : "#818cf8" },
-                { label: "MA Balance (S$)",                              value: maStart, set: setMaStart, color: "#f472b6" },
-              ].map(({ label, value, set, color }) => (
+                { key: "OA", label: "OA Balance (S$)",                                  value: oaStart, set: setOaStart, color: "#4ade80" },
+                { key: age >= 55 ? "RA" : "SA", label: age >= 55 ? "RA Balance (S$)" : "SA Balance (S$)", value: saStart, set: setSaStart, color: age >= 55 ? "#a78bfa" : "#818cf8" },
+                { key: "MA", label: "MA Balance (S$)",                                  value: maStart, set: setMaStart, color: "#f472b6" },
+              ].map(({ key, label, value, set, color }) => (
                 <div key={label} style={{ marginBottom: 14 }}>
-                  <label style={{ fontSize: 13, color: "var(--label)", fontWeight: 500, display: "block", marginBottom: 6 }}>{label}</label>
+                  <label style={{ fontSize: 13, color: "var(--label)", fontWeight: 500, display: "flex", alignItems: "center", marginBottom: 6 }}>
+                    {label} <Hint text={GLOSSARY[key]} />
+                  </label>
                   <input
                     type="number" min="0" value={value || ""} placeholder="0"
                     onChange={e => set(parseFloat(e.target.value) || 0)}
@@ -319,7 +395,9 @@ export default function CPFCalculator() {
                   <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: saShieldOn ? 10 : 0 }}>
                     <input type="checkbox" checked={saShieldOn} onChange={e => setSaShieldOn(e.target.checked)}
                       style={{ width: 15, height: 15, accentColor: "var(--accent)", cursor: "pointer" }} />
-                    <span style={{ fontSize: 13, color: "var(--label)", fontWeight: 600 }}>SA Shielding (CPFIS-SA)</span>
+                    <span style={{ fontSize: 13, color: "var(--label)", fontWeight: 600, display: "flex", alignItems: "center" }}>
+                      SA Shielding (CPFIS-SA) <Hint text={GLOSSARY["CPFIS-SA"]} />
+                    </span>
                   </label>
                   {saShieldOn && (
                     <>
@@ -347,103 +425,155 @@ export default function CPFCalculator() {
                 </div>
               )}
             </div>
+
+            {/* Monthly Breakdown */}
+            <MonthlyBreakdown monthly={monthly} prYear={prYear} age={age} />
+
           </div>
         </div>
 
-        {/* ── Monthly Breakdown ───────────────────────────────────────────── */}
-        <MonthlyBreakdown monthly={monthly} prYear={prYear} age={age} />
+        {/* ════ RIGHT MAIN ════════════════════════════════════════════════════ */}
+        <div style={{ minWidth: 0 }}>
 
-        {/* ── Tab bar ─────────────────────────────────────────────────────── */}
-        <div
-          role="tablist"
-          aria-label="Calculator sections"
-          style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap" }}
-          onKeyDown={(e) => {
-            const ids = TABS.map(([id]) => id);
-            const cur = ids.indexOf(activeTab);
-            if (e.key === "ArrowRight") { e.preventDefault(); setActiveTab(ids[(cur + 1) % ids.length]); }
-            if (e.key === "ArrowLeft")  { e.preventDefault(); setActiveTab(ids[(cur - 1 + ids.length) % ids.length]); }
-            if (e.key === "Home")       { e.preventDefault(); setActiveTab(ids[0]); }
-            if (e.key === "End")        { e.preventDefault(); setActiveTab(ids[ids.length - 1]); }
-          }}
-        >
-          {TABS.map(([id, label]) => (
-            <button
-              key={id}
-              role="tab"
-              aria-selected={activeTab === id}
-              aria-controls={`tabpanel-${id}`}
-              id={`tab-${id}`}
-              tabIndex={activeTab === id ? 0 : -1}
-              className={`tab-btn ${activeTab === id ? "active" : ""}`}
-              onClick={() => setActiveTab(id)}
-            >
-              {label}
-            </button>
-          ))}
+          {/* ── Live result strip ─────────────────────────────────────────── */}
+          <div style={{
+            display: "flex", gap: 12, marginBottom: 16,
+            padding: "12px 18px",
+            background: "var(--card-bg)",
+            border: "1px solid var(--border)",
+            borderRadius: 14,
+            flexWrap: "wrap",
+            position: "sticky", top: 0, zIndex: 10,
+          }}>
+            {[
+              { label: `Total CPF · ${yearsToProject} yr`, value: fmtD(finalData.total),     color: "var(--accent)"  },
+              { label: "Monthly Take-Home",                 value: fmtD(monthly.takeHome),     color: "var(--text)"    },
+              { label: "Total CPF Contrib/mo",              value: fmtD(monthly.totalContrib), color: "var(--accent2)" },
+            ].map(({ label, value, color }) => (
+              <div key={label} style={{ flex: "1 1 160px", minWidth: 0 }}>
+                <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, marginBottom: 3 }}>
+                  {label}
+                </div>
+                <div style={{ fontSize: 18, fontWeight: 800, color, fontFamily: "'DM Mono', monospace", lineHeight: 1.2 }}>
+                  {value}
+                </div>
+              </div>
+            ))}
+          </div>
+
+          {/* ── Tab bar ───────────────────────────────────────────────────── */}
+          <div
+            role="tablist"
+            aria-label="Calculator sections"
+            style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}
+            onKeyDown={(e) => {
+              const ids = TABS.map(([id]) => id);
+              const cur = ids.indexOf(activeTab);
+              if (e.key === "ArrowRight") { e.preventDefault(); setActiveTab(ids[(cur + 1) % ids.length]); }
+              if (e.key === "ArrowLeft")  { e.preventDefault(); setActiveTab(ids[(cur - 1 + ids.length) % ids.length]); }
+              if (e.key === "Home")       { e.preventDefault(); setActiveTab(ids[0]); }
+              if (e.key === "End")        { e.preventDefault(); setActiveTab(ids[ids.length - 1]); }
+            }}
+          >
+            {CPF_TABS.map(([id, label]) => (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={activeTab === id}
+                aria-controls={`tabpanel-${id}`}
+                id={`tab-${id}`}
+                tabIndex={activeTab === id ? 0 : -1}
+                className={`tab-btn ${activeTab === id ? "active" : ""}`}
+                onClick={() => setActiveTab(id)}
+              >{label}</button>
+            ))}
+
+            {/* Group separator */}
+            <div aria-hidden="true" style={{ display: "flex", alignItems: "center", gap: 6, padding: "0 4px", flexShrink: 0 }}>
+              <div style={{ width: 1, height: 24, background: "var(--border)" }} />
+              <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted)", whiteSpace: "nowrap" }}>
+                Assets &amp; Planning
+              </span>
+              <div style={{ width: 1, height: 24, background: "var(--border)" }} />
+            </div>
+
+            {ASSET_TABS.map(([id, label]) => (
+              <button
+                key={id}
+                role="tab"
+                aria-selected={activeTab === id}
+                aria-controls={`tabpanel-${id}`}
+                id={`tab-${id}`}
+                tabIndex={activeTab === id ? 0 : -1}
+                className={`tab-btn ${activeTab === id ? "active" : ""}`}
+                onClick={() => setActiveTab(id)}
+              >{label}</button>
+            ))}
+          </div>
+
+          {/* ── Tab content ───────────────────────────────────────────────── */}
+          {activeTab === "summary" && (
+            <div role="tabpanel" id="tabpanel-summary" aria-labelledby="tab-summary" style={{ marginBottom: 28 }}>
+              <ErrorBoundary key="summary">
+                <SummaryTab cpfData={finalData} yearsToProject={yearsToProject} projectionData={projectionData} />
+              </ErrorBoundary>
+            </div>
+          )}
+
+          {activeTab === "projection" && (
+            <div role="tabpanel" id="tabpanel-projection" aria-labelledby="tab-projection">
+              <ErrorBoundary key="projection">
+                <ProjectionTab
+                  projectionData={projectionData} finalData={finalData}
+                  yearsToProject={yearsToProject} ceilingGrowth={ceilingGrowth}
+                  saReturn={saReturn} cpfLifePayout={cpfLifePayout}
+                  gridLineColor={tv["--grid-line"]}
+                />
+              </ErrorBoundary>
+            </div>
+          )}
+
+          {activeTab === "table" && (
+            <div role="tabpanel" id="tabpanel-table" aria-labelledby="tab-table">
+              <ErrorBoundary key="table">
+                <ProjectionTableTab
+                  projectionData={projectionData}
+                  effectiveSaShield={effectiveSaShield}
+                  rowAltColor={tv["--row-alt"]}
+                />
+              </ErrorBoundary>
+            </div>
+          )}
+
+          {activeTab === "housing"  && <div role="tabpanel" id="tabpanel-housing"  aria-labelledby="tab-housing"  style={{ marginBottom: 28 }}><ErrorBoundary key="housing"><HousingLoanTab /></ErrorBoundary></div>}
+          {activeTab === "mystocks" && <div role="tabpanel" id="tabpanel-mystocks" aria-labelledby="tab-mystocks" style={{ marginBottom: 28 }}><ErrorBoundary key="mystocks"><MYStocksTab /></ErrorBoundary></div>}
+          {activeTab === "stocks"   && <div role="tabpanel" id="tabpanel-stocks"   aria-labelledby="tab-stocks"   style={{ marginBottom: 28 }}><ErrorBoundary key="stocks"><StocksTab /></ErrorBoundary></div>}
+          {activeTab === "crypto"   && <div role="tabpanel" id="tabpanel-crypto"   aria-labelledby="tab-crypto"   style={{ marginBottom: 28 }}><ErrorBoundary key="crypto"><CryptoTab /></ErrorBoundary></div>}
+          {activeTab === "epf"      && <div role="tabpanel" id="tabpanel-epf"      aria-labelledby="tab-epf"      style={{ marginBottom: 28 }}><ErrorBoundary key="epf"><EPFTab /></ErrorBoundary></div>}
+          {activeTab === "fd"       && <div role="tabpanel" id="tabpanel-fd"       aria-labelledby="tab-fd"       style={{ marginBottom: 28 }}><ErrorBoundary key="fd"><FixedDepositsTab /></ErrorBoundary></div>}
+          {activeTab === "savings"  && <div role="tabpanel" id="tabpanel-savings"  aria-labelledby="tab-savings"  style={{ marginBottom: 28 }}><ErrorBoundary key="savings"><SavingsTab projectionData={projectionData} yearsToProject={yearsToProject} cpfMonthly={monthly} salary={salary} /></ErrorBoundary></div>}
+          {activeTab === "fire"     && <div role="tabpanel" id="tabpanel-fire"     aria-labelledby="tab-fire"     style={{ marginBottom: 28 }}><ErrorBoundary key="fire"><FireTab projectionData={projectionData} yearsToProject={yearsToProject} /></ErrorBoundary></div>}
+          {activeTab === "networth" && <div role="tabpanel" id="tabpanel-networth" aria-labelledby="tab-networth" style={{ marginBottom: 28 }}><ErrorBoundary key="networth"><NetWorthTab projectionData={projectionData} yearsToProject={yearsToProject} /></ErrorBoundary></div>}
+
+          {/* ── Summary cards ─────────────────────────────────────────────── */}
+          <CpfSummaryCards
+            finalData={finalData} yearsToProject={yearsToProject}
+            oaReturn={oaReturn} saReturn={saReturn} maReturn={maReturn}
+            cpfLifePayout={cpfLifePayout}
+          />
+
+          {/* ── Footer ────────────────────────────────────────────────────── */}
+          <div style={{ padding: "16px 20px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7 }}>
+            <strong style={{ color: "var(--label)" }}>Disclaimer:</strong> This calculator is for estimation purposes only.
+            Rates are based on CPF Board's official tables effective 1 Jan 2026. OW ceiling $8,000/month.
+            MA is capped at the Basic Healthcare Sum (BHS, {fmtD(CPF_BHS_2026)} in 2026); excess overflows to SA/RA.
+            At 55, SA + OA top-up are transferred to RA up to the Full Retirement Sum (FRS, {fmtD(CPF_FRS_2026)} in 2026).
+            Both ceilings are projected forward using the FRS/BHS Growth Rate slider.
+            CPF LIFE payout is a rough estimate for the Standard Plan at ~6.3%/yr of RA at 65.
+            Always verify at <span style={{ color: "var(--accent)" }}>cpf.gov.sg</span>.
+          </div>
         </div>
 
-        {/* ── Tab content ─────────────────────────────────────────────────── */}
-        {activeTab === "summary" && (
-          <div role="tabpanel" id="tabpanel-summary" aria-labelledby="tab-summary" style={{ marginBottom: 28 }}>
-            <ErrorBoundary key="summary">
-              <SummaryTab cpfData={finalData} yearsToProject={yearsToProject} projectionData={projectionData} />
-            </ErrorBoundary>
-          </div>
-        )}
-
-        {activeTab === "projection" && (
-          <div role="tabpanel" id="tabpanel-projection" aria-labelledby="tab-projection">
-            <ErrorBoundary key="projection">
-              <ProjectionTab
-                projectionData={projectionData} finalData={finalData}
-                yearsToProject={yearsToProject} ceilingGrowth={ceilingGrowth}
-                saReturn={saReturn} cpfLifePayout={cpfLifePayout}
-                gridLineColor={tv["--grid-line"]}
-              />
-            </ErrorBoundary>
-          </div>
-        )}
-
-        {activeTab === "table" && (
-          <div role="tabpanel" id="tabpanel-table" aria-labelledby="tab-table">
-            <ErrorBoundary key="table">
-              <ProjectionTableTab
-                projectionData={projectionData}
-                effectiveSaShield={effectiveSaShield}
-                rowAltColor={tv["--row-alt"]}
-              />
-            </ErrorBoundary>
-          </div>
-        )}
-
-        {activeTab === "housing"  && <div role="tabpanel" id="tabpanel-housing"  aria-labelledby="tab-housing"  style={{ marginBottom: 28 }}><ErrorBoundary key="housing"><HousingLoanTab /></ErrorBoundary></div>}
-        {activeTab === "mystocks" && <div role="tabpanel" id="tabpanel-mystocks" aria-labelledby="tab-mystocks" style={{ marginBottom: 28 }}><ErrorBoundary key="mystocks"><MYStocksTab /></ErrorBoundary></div>}
-        {activeTab === "stocks"   && <div role="tabpanel" id="tabpanel-stocks"   aria-labelledby="tab-stocks"   style={{ marginBottom: 28 }}><ErrorBoundary key="stocks"><StocksTab /></ErrorBoundary></div>}
-        {activeTab === "crypto"   && <div role="tabpanel" id="tabpanel-crypto"   aria-labelledby="tab-crypto"   style={{ marginBottom: 28 }}><ErrorBoundary key="crypto"><CryptoTab /></ErrorBoundary></div>}
-        {activeTab === "epf"      && <div role="tabpanel" id="tabpanel-epf"      aria-labelledby="tab-epf"      style={{ marginBottom: 28 }}><ErrorBoundary key="epf"><EPFTab /></ErrorBoundary></div>}
-        {activeTab === "fd"       && <div role="tabpanel" id="tabpanel-fd"       aria-labelledby="tab-fd"       style={{ marginBottom: 28 }}><ErrorBoundary key="fd"><FixedDepositsTab /></ErrorBoundary></div>}
-        {activeTab === "savings"  && <div role="tabpanel" id="tabpanel-savings"  aria-labelledby="tab-savings"  style={{ marginBottom: 28 }}><ErrorBoundary key="savings"><SavingsTab projectionData={projectionData} yearsToProject={yearsToProject} cpfMonthly={monthly} salary={salary} /></ErrorBoundary></div>}
-        {activeTab === "fire"     && <div role="tabpanel" id="tabpanel-fire"     aria-labelledby="tab-fire"     style={{ marginBottom: 28 }}><ErrorBoundary key="fire"><FireTab projectionData={projectionData} yearsToProject={yearsToProject} /></ErrorBoundary></div>}
-        {activeTab === "networth" && <div role="tabpanel" id="tabpanel-networth" aria-labelledby="tab-networth" style={{ marginBottom: 28 }}><ErrorBoundary key="networth"><NetWorthTab projectionData={projectionData} yearsToProject={yearsToProject} /></ErrorBoundary></div>}
-
-        {/* ── Bottom summary cards ─────────────────────────────────────────── */}
-        <CpfSummaryCards
-          finalData={finalData} yearsToProject={yearsToProject}
-          oaReturn={oaReturn} saReturn={saReturn} maReturn={maReturn}
-          cpfLifePayout={cpfLifePayout}
-        />
-
-        {/* ── Footer ──────────────────────────────────────────────────────── */}
-        <div style={{ padding: "16px 20px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7 }}>
-          <strong style={{ color: "var(--label)" }}>Disclaimer:</strong> This calculator is for estimation purposes only.
-          Rates are based on CPF Board's official tables effective 1 Jan 2026. OW ceiling $8,000/month.
-          MA is capped at the Basic Healthcare Sum (BHS, {fmtD(CPF_BHS_2026)} in 2026); excess overflows to SA/RA.
-          At 55, SA + OA top-up are transferred to RA up to the Full Retirement Sum (FRS, {fmtD(CPF_FRS_2026)} in 2026).
-          Both ceilings are projected forward using the FRS/BHS Growth Rate slider.
-          CPF LIFE payout is a rough estimate for the Standard Plan at ~6.3%/yr of RA at 65.
-          Always verify at <span style={{ color: "var(--accent)" }}>cpf.gov.sg</span>.
-        </div>
       </div>
     </div>
   );
