@@ -132,14 +132,14 @@ export default function CPFCalculator() {
   const tv = THEMES[theme];
 
   // ─── Core inputs ────────────────────────────────────────────────────────
-  const [salary, setSalary]                     = useState(5000);
-  const [age, setAge]                           = useState(30);
-  const [prYear, setPrYear]                     = useState(1);
-  const [annualIncrement, setAnnualIncrement]   = useState(3);
-  const [yearsToProject, setYearsToProject]     = useState(20);
-  const [oaReturn, setOaReturn]                 = useState(2.5);
-  const [saReturn, setSaReturn]                 = useState(4.0);
-  const [maReturn, setMaReturn]                 = useState(4.0);
+  const [salary, setSalary]                     = useState(() => lsFloat("cpf_salary",    5000));
+  const [age, setAge]                           = useState(() => lsFloat("cpf_age",        30));
+  const [prYear, setPrYear]                     = useState(() => lsFloat("cpf_pr_year",     1));
+  const [annualIncrement, setAnnualIncrement]   = useState(() => lsFloat("cpf_increment",   3));
+  const [yearsToProject, setYearsToProject]     = useState(() => lsFloat("cpf_years",      20));
+  const [oaReturn, setOaReturn]                 = useState(() => lsFloat("cpf_oa_return",  2.5));
+  const [saReturn, setSaReturn]                 = useState(() => lsFloat("cpf_sa_return",  4.0));
+  const [maReturn, setMaReturn]                 = useState(() => lsFloat("cpf_ma_return",  4.0));
   const [oaStart, setOaStart]   = useState(() => lsFloat("cpf_oa_start",       0));
   const [saStart, setSaStart]   = useState(() => lsFloat("cpf_sa_start",       0));
   const [maStart, setMaStart]   = useState(() => lsFloat("cpf_ma_start",       0));
@@ -148,10 +148,21 @@ export default function CPFCalculator() {
   const [saShieldOn, setSaShieldOn] = useState(() => lsFloat("cpf_sa_shield", 0) > 0);
   const [activeTab, setActiveTab]   = useState(() => localStorage.getItem("active_tab") || "summary");
   const [pdfBusy, setPdfBusy]       = useState(false);
+  const [pdfError, setPdfError]     = useState(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
+  // Show a first-run banner until the user changes salary (key not in storage yet)
+  const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem("cpf_salary"));
 
   // ─── Persistence ────────────────────────────────────────────────────────
   useEffect(() => { try { localStorage.setItem("active_tab",        activeTab);                  } catch {} }, [activeTab]);
+  useEffect(() => { try { localStorage.setItem("cpf_salary",         salary);                    } catch {} }, [salary]);
+  useEffect(() => { try { localStorage.setItem("cpf_age",            age);                       } catch {} }, [age]);
+  useEffect(() => { try { localStorage.setItem("cpf_pr_year",        prYear);                    } catch {} }, [prYear]);
+  useEffect(() => { try { localStorage.setItem("cpf_increment",      annualIncrement);            } catch {} }, [annualIncrement]);
+  useEffect(() => { try { localStorage.setItem("cpf_years",          yearsToProject);             } catch {} }, [yearsToProject]);
+  useEffect(() => { try { localStorage.setItem("cpf_oa_return",      oaReturn);                  } catch {} }, [oaReturn]);
+  useEffect(() => { try { localStorage.setItem("cpf_sa_return",      saReturn);                  } catch {} }, [saReturn]);
+  useEffect(() => { try { localStorage.setItem("cpf_ma_return",      maReturn);                  } catch {} }, [maReturn]);
   useEffect(() => { try { localStorage.setItem("cpf_oa_start",       oaStart);                   } catch {} }, [oaStart]);
   useEffect(() => { try { localStorage.setItem("cpf_sa_start",       saStart);                   } catch {} }, [saStart]);
   useEffect(() => { try { localStorage.setItem("cpf_ma_start",       maStart);                   } catch {} }, [maStart]);
@@ -189,12 +200,16 @@ export default function CPFCalculator() {
   const handleExportPdf = useCallback(async () => {
     if (pdfBusy) return;
     setPdfBusy(true);
+    setPdfError(null);
     try {
       await exportCpfPdf({
         projectionData, salary, age, prYear, annualIncrement, yearsToProject,
         oaReturn, saReturn, maReturn, ceilingGrowth,
         saShield: effectiveSaShield, cpfLifePayout,
       });
+    } catch (e) {
+      setPdfError(e?.message || "PDF generation failed — try again");
+      setTimeout(() => setPdfError(null), 5000);
     } finally {
       setPdfBusy(false);
     }
@@ -262,7 +277,10 @@ export default function CPFCalculator() {
                 Singapore 2026
               </span>
             </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+              {pdfError && (
+                <span style={{ fontSize: 11, color: "#f87171", fontWeight: 500 }}>⚠ {pdfError}</span>
+              )}
               <button
                 onClick={() => setTheme(t => t === "dark" ? "light" : "dark")}
                 title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
@@ -305,9 +323,19 @@ export default function CPFCalculator() {
               <div style={{ marginBottom: 18 }}>
                 <label style={{ fontSize: 13, color: "var(--label)", fontWeight: 500, display: "block", marginBottom: 6 }}>Monthly Salary (SGD)</label>
                 <input
-                  type="number" className="input-field" value={salary} min={0} step={100}
-                  onChange={e => setSalary(Math.max(0, parseInt(e.target.value) || 0))}
+                  type="number" className="input-field" value={salary || ""} min={0} step={100}
+                  placeholder="e.g. 5000"
+                  onChange={e => {
+                    const v = Math.max(0, parseInt(e.target.value) || 0);
+                    setSalary(v);
+                    setShowWelcome(false);
+                  }}
                 />
+                {salary === 0 && (
+                  <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 6 }}>
+                    Enter your monthly salary to see projections
+                  </div>
+                )}
                 {salary > OW_CEILING && (
                   <div style={{ fontSize: 11, color: "#fbbf24", marginTop: 6 }}>
                     ⚠ Capped at ${fmt(OW_CEILING)} OW ceiling for CPF
@@ -435,34 +463,53 @@ export default function CPFCalculator() {
         {/* ════ RIGHT MAIN ════════════════════════════════════════════════════ */}
         <div style={{ minWidth: 0 }}>
 
-          {/* ── Live result strip ─────────────────────────────────────────── */}
-          <div style={{
-            display: "flex", gap: 12, marginBottom: 16,
-            padding: "12px 18px",
-            background: "var(--card-bg)",
-            border: "1px solid var(--border)",
-            borderRadius: 14,
-            flexWrap: "wrap",
-            position: "sticky", top: 0, zIndex: 10,
-          }}>
-            {[
-              { label: `Total CPF · ${yearsToProject} yr`, value: fmtD(finalData.total),     color: "var(--accent)"  },
-              { label: "Monthly Take-Home",                 value: fmtD(monthly.takeHome),     color: "var(--text)"    },
-              { label: "Total CPF Contrib/mo",              value: fmtD(monthly.totalContrib), color: "var(--accent2)" },
-            ].map(({ label, value, color }) => (
-              <div key={label} style={{ flex: "1 1 160px", minWidth: 0 }}>
-                <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, marginBottom: 3 }}>
-                  {label}
-                </div>
-                <div style={{ fontSize: 18, fontWeight: 800, color, fontFamily: "'DM Mono', monospace", lineHeight: 1.2 }}>
-                  {value}
-                </div>
-              </div>
-            ))}
-          </div>
+          {/* ── Sticky nav: result strip + tab bar ────────────────────────── */}
+          <div style={{ position: "sticky", top: 0, zIndex: 10, background: "var(--bg)", paddingBottom: 12 }}>
 
-          {/* ── Tab bar ───────────────────────────────────────────────────── */}
-          <div
+            {/* First-run welcome banner */}
+            {showWelcome && (
+              <div style={{
+                display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+                marginBottom: 10, padding: "10px 14px", borderRadius: 10,
+                background: "var(--accent-subtle)", border: "1px solid var(--accent-border-c)",
+                fontSize: 12, color: "var(--label)", lineHeight: 1.5,
+              }}>
+                <span>👆 These are example values — enter your salary and age in the sidebar to personalise your projection.</span>
+                <button
+                  onClick={() => setShowWelcome(false)}
+                  style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--muted)", fontSize: 16, lineHeight: 1, padding: 0, flexShrink: 0 }}
+                  aria-label="Dismiss"
+                >×</button>
+              </div>
+            )}
+
+            {/* Live result strip */}
+            <div style={{
+              display: "flex", gap: 12, marginBottom: 12,
+              padding: "12px 18px",
+              background: "var(--card-bg)",
+              border: "1px solid var(--border)",
+              borderRadius: 14,
+              flexWrap: "wrap",
+            }}>
+              {[
+                { label: `Total CPF · ${yearsToProject} yr`, value: fmtD(finalData.total),     color: "var(--accent)"  },
+                { label: "Monthly Take-Home",                 value: fmtD(monthly.takeHome),     color: "var(--text)"    },
+                { label: "Total CPF Contrib/mo",              value: fmtD(monthly.totalContrib), color: "var(--accent2)" },
+              ].map(({ label, value, color }) => (
+                <div key={label} style={{ flex: "1 1 160px", minWidth: 0 }}>
+                  <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, marginBottom: 3 }}>
+                    {label}
+                  </div>
+                  <div style={{ fontSize: 18, fontWeight: 800, color, fontFamily: "'DM Mono', monospace", lineHeight: 1.2 }}>
+                    {value}
+                  </div>
+                </div>
+              ))}
+            </div>
+
+            {/* Tab bar */}
+            <div
             role="tablist"
             aria-label="Calculator sections"
             style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}
@@ -512,7 +559,8 @@ export default function CPFCalculator() {
                 onClick={() => setActiveTab(id)}
               >{label}</button>
             ))}
-          </div>
+            </div>{/* end tab bar */}
+          </div>{/* end sticky nav wrapper */}
 
           {/* ── Tab content ───────────────────────────────────────────────── */}
           {activeTab === "summary" && (
