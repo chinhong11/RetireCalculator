@@ -43,12 +43,10 @@ export default function HousingLoanTab() {
 
   const delProp = () => {
     if (!window.confirm(`Delete "${prop?.name}"? This cannot be undone.`)) return;
-    setProperties(ps => {
-      const next = ps.filter(p => p.id !== effectiveId);
-      const fallback = next.length ? next : [newProperty()];
-      setSelId(fallback[0].id);
-      return fallback;
-    });
+    const next = properties.filter(p => p.id !== effectiveId);
+    const fallback = next.length ? next : [newProperty()];
+    setProperties(fallback);
+    setSelId(fallback[0].id);
   };
 
   const addDP = () => {
