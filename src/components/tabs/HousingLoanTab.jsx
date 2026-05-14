@@ -56,7 +56,7 @@ export default function HousingLoanTab() {
     setDpForm({ date: "", amount: "", note: "" });
   };
 
-  const delDP = (recId) => prop && upd({ downpaymentRecords: prop.downpaymentRecords.filter(r => r.id !== recId) });
+  const delDP = (recId) => prop && upd({ downpaymentRecords: (prop.downpaymentRecords || []).filter(r => r.id !== recId) });
 
   const addPR = () => {
     if (!prop || !prForm.month || !prForm.claimAmount) return;
@@ -65,7 +65,7 @@ export default function HousingLoanTab() {
     setPrForm({ month: "", claimAmount: "", stage: "", note: "" });
   };
 
-  const delPR = (recId) => prop && upd({ progressiveRecords: prop.progressiveRecords.filter(r => r.id !== recId) });
+  const delPR = (recId) => prop && upd({ progressiveRecords: (prop.progressiveRecords || []).filter(r => r.id !== recId) });
 
   const totalDownpaid = useMemo(() =>
     (prop?.downpaymentRecords || []).reduce((s, r) => s + (r.amount || 0), 0), [prop]);
@@ -409,7 +409,7 @@ export default function HousingLoanTab() {
           </div>
           <button onClick={addDP} style={addBtnStyle}>+ Add</button>
         </div>
-        {prop.downpaymentRecords.length > 0 ? (
+        {(prop.downpaymentRecords || []).length > 0 ? (
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
