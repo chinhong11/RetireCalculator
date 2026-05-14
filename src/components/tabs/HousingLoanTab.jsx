@@ -4,6 +4,9 @@ import { toCsv, downloadBlob, printTable } from "../../lib/backup.js";
 import { StatCard } from "../shared/StatCard.jsx";
 import { LabelField } from "../shared/LabelField.jsx";
 
+const safeFloat = (val, max = 1e9) => { const n = parseFloat(val); return isFinite(n) ? Math.min(Math.max(0, n), max) : 0; };
+const safeInt   = (val, max = 1e6) => { const n = parseInt(val, 10); return isFinite(n) ? Math.min(Math.max(0, n), max) : 0; };
+
 export default function HousingLoanTab() {
   const [properties, setProperties] = useState(() => {
     try {
@@ -57,7 +60,7 @@ export default function HousingLoanTab() {
       return;
     }
     setDpError("");
-    const rec = { id: uid(), date: dpForm.date, amount: parseFloat(dpForm.amount) || 0, note: dpForm.note.trim() };
+    const rec = { id: uid(), date: dpForm.date, amount: safeFloat(dpForm.amount), note: dpForm.note.trim() };
     upd({ downpaymentRecords: [...(prop.downpaymentRecords || []), rec].sort((a, b) => a.date.localeCompare(b.date)) });
     setDpForm({ date: "", amount: "", note: "" });
   };
@@ -70,7 +73,7 @@ export default function HousingLoanTab() {
       return;
     }
     setPrError("");
-    const rec = { id: uid(), month: prForm.month, claimAmount: parseFloat(prForm.claimAmount) || 0, stage: prForm.stage.trim(), note: prForm.note.trim() };
+    const rec = { id: uid(), month: prForm.month, claimAmount: safeFloat(prForm.claimAmount), stage: prForm.stage.trim(), note: prForm.note.trim() };
     upd({ progressiveRecords: [...(prop.progressiveRecords || []), rec].sort((a, b) => a.month.localeCompare(b.month)) });
     setPrForm({ month: "", claimAmount: "", stage: "", note: "" });
   };
@@ -303,13 +306,13 @@ export default function HousingLoanTab() {
             </select>
           </LabelField>
           <LabelField label="Purchase Price (RM)">
-            <input className="hl-in" type="number" value={prop.purchasePrice} onChange={e => upd({ purchasePrice: parseFloat(e.target.value) || 0 })} min={0} step={1000} style={{ fontFamily: "'DM Mono', monospace" }} />
+            <input className="hl-in" type="number" value={prop.purchasePrice} onChange={e => upd({ purchasePrice: safeFloat(e.target.value, 1e9) })} min={0} step={1000} style={{ fontFamily: "'DM Mono', monospace" }} />
           </LabelField>
           <LabelField label="Interest Rate (% p.a.)">
-            <input className="hl-in" type="number" value={prop.interestRate} onChange={e => upd({ interestRate: parseFloat(e.target.value) || 0 })} min={0} max={20} step={0.05} style={{ fontFamily: "'DM Mono', monospace" }} />
+            <input className="hl-in" type="number" value={prop.interestRate} onChange={e => upd({ interestRate: safeFloat(e.target.value, 20) })} min={0} max={20} step={0.05} style={{ fontFamily: "'DM Mono', monospace" }} />
           </LabelField>
           <LabelField label="Loan Tenure (Years)">
-            <input className="hl-in" type="number" value={prop.tenure} onChange={e => upd({ tenure: parseInt(e.target.value) || 0 })} min={1} max={35} step={1} style={{ fontFamily: "'DM Mono', monospace" }} />
+            <input className="hl-in" type="number" value={prop.tenure} onChange={e => upd({ tenure: safeInt(e.target.value, 35) })} min={1} max={35} step={1} style={{ fontFamily: "'DM Mono', monospace" }} />
           </LabelField>
           <LabelField label="SPA Date">
             <input className="hl-in" type="date" value={prop.spaDate} onChange={e => upd({ spaDate: e.target.value })} />
