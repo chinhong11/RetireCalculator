@@ -79,13 +79,35 @@ export default function HousingLoanTab() {
     if (!prop) return [];
     const r = (prop.interestRate || 0) / 100 / 12;
     let cum = 0;
-    return (prop.progressiveRecords || []).map(rec => {
+    const records = prop.progressiveRecords || [];
+    const vpDate = prop.vpDate ? new Date(prop.vpDate + "-01") : null;
+
+    return records.map((rec, idx) => {
       cum += rec.claimAmount || 0;
-      return { ...rec, cumulative: cum, monthlyInterest: cum * r };
+      const monthlyInterest = cum * r;
+
+      // Months this stage's cumulative amount accrues interest:
+      // from this claim month until the next claim (or VP date).
+      let stageDuration = null;
+      if (rec.month) {
+        const claimDate = new Date(rec.month + "-01");
+        const nextRec = records[idx + 1];
+        const endDate = nextRec?.month ? new Date(nextRec.month + "-01") : vpDate;
+        if (endDate && endDate > claimDate) {
+          stageDuration = (endDate.getFullYear() - claimDate.getFullYear()) * 12
+                        + (endDate.getMonth() - claimDate.getMonth());
+        }
+      }
+
+      const stageInterestTotal = stageDuration !== null
+        ? monthlyInterest * stageDuration
+        : monthlyInterest;
+
+      return { ...rec, cumulative: cum, monthlyInterest, stageDuration, stageInterestTotal };
     });
   }, [prop]);
 
-  const totalProgInterest = progressiveTimeline.reduce((s, r) => s + r.monthlyInterest, 0);
+  const totalProgInterest = progressiveTimeline.reduce((s, r) => s + r.stageInterestTotal, 0);
 
   const amortSchedule = useMemo(() => {
     if (!loanAmount || !prop?.interestRate || !prop?.tenure || !monthlyInstallment) return [];
@@ -484,7 +506,7 @@ export default function HousingLoanTab() {
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                    {["Month", "Stage", "Claim (RM)", "Cumulative Disbursed", "Monthly Interest", "Note", ""].map(h => (
+                    {["Month", "Stage", "Claim (RM)", "Cumulative Disbursed", "Monthly Interest", "Months", "Stage Interest", "Note", ""].map(h => (
                       <th key={h} style={{ padding: "10px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>{h}</th>
                     ))}
                   </tr>
@@ -497,6 +519,8 @@ export default function HousingLoanTab() {
                       <td style={{ padding: "10px 12px", fontFamily: "'DM Mono', monospace", fontWeight: 600, color: "#818cf8" }}>{RM(r.claimAmount)}</td>
                       <td style={{ padding: "10px 12px", fontFamily: "'DM Mono', monospace", color: "var(--accent2)" }}>{RM(r.cumulative)}</td>
                       <td style={{ padding: "10px 12px", fontFamily: "'DM Mono', monospace", fontWeight: 700, color: "#f472b6" }}>{RM2(r.monthlyInterest)}</td>
+                      <td style={{ padding: "10px 12px", fontFamily: "'DM Mono', monospace", color: "var(--muted)", textAlign: "center" }}>{r.stageDuration ?? "—"}</td>
+                      <td style={{ padding: "10px 12px", fontFamily: "'DM Mono', monospace", fontWeight: 700, color: "#f472b6" }}>{RM2(r.stageInterestTotal)}</td>
                       <td style={{ padding: "10px 12px", color: "var(--muted)", fontSize: 12 }}>{r.note || "—"}</td>
                       <td style={{ padding: "10px 12px" }}>
                         <button onClick={() => delPR(r.id)} style={{ color: "#f87171", background: "none", border: "none", cursor: "pointer", fontSize: 14, padding: "2px 8px" }}>✕</button>
@@ -506,7 +530,7 @@ export default function HousingLoanTab() {
                 </tbody>
                 <tfoot>
                   <tr style={{ borderTop: "2px solid var(--border)" }}>
-                    <td colSpan={4} style={{ padding: "12px", fontWeight: 700, color: "var(--label)" }}>Est. Total Interest During Construction</td>
+                    <td colSpan={6} style={{ padding: "12px", fontWeight: 700, color: "var(--label)" }}>Est. Total Interest During Construction</td>
                     <td style={{ padding: "12px", fontFamily: "'DM Mono', monospace", fontWeight: 800, color: "#f472b6", fontSize: 15 }}>{RM2(totalProgInterest)}</td>
                     <td colSpan={2} />
                   </tr>
