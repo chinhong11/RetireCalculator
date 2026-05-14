@@ -80,10 +80,22 @@ export default function HousingLoanTab() {
   const totalDownpaid = useMemo(() =>
     (prop?.downpaymentRecords || []).reduce((s, r) => s + (r.amount || 0), 0), [prop]);
 
-  const loanAmount = Math.max(0, (prop?.purchasePrice || 0) - totalDownpaid);
-  const monthlyInstallment = calcInstallment(loanAmount, prop?.interestRate || 0, prop?.tenure || 0);
-  const totalPayable = monthlyInstallment * (prop?.tenure || 0) * 12;
-  const totalInterest = Math.max(0, totalPayable - loanAmount);
+  const loanAmount = useMemo(
+    () => Math.max(0, (prop?.purchasePrice || 0) - totalDownpaid),
+    [prop?.purchasePrice, totalDownpaid],
+  );
+  const monthlyInstallment = useMemo(
+    () => calcInstallment(loanAmount, prop?.interestRate || 0, prop?.tenure || 0),
+    [loanAmount, prop?.interestRate, prop?.tenure],
+  );
+  const totalPayable = useMemo(
+    () => monthlyInstallment * (prop?.tenure || 0) * 12,
+    [monthlyInstallment, prop?.tenure],
+  );
+  const totalInterest = useMemo(
+    () => Math.max(0, totalPayable - loanAmount),
+    [totalPayable, loanAmount],
+  );
 
   const progressiveTimeline = useMemo(() => {
     if (!prop) return [];
