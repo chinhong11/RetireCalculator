@@ -18,7 +18,9 @@ export default function HousingLoanTab() {
   });
 
   const [dpForm, setDpForm] = useState({ date: "", amount: "", note: "" });
+  const [dpError, setDpError] = useState("");
   const [prForm, setPrForm] = useState({ month: "", claimAmount: "", stage: "", note: "" });
+  const [prError, setPrError] = useState("");
   const [showAmort, setShowAmort] = useState(false);
   const [amortYear, setAmortYear] = useState(1);
 
@@ -50,7 +52,11 @@ export default function HousingLoanTab() {
   };
 
   const addDP = () => {
-    if (!prop || !dpForm.date || !dpForm.amount) return;
+    if (!dpForm.date || !dpForm.amount) {
+      setDpError(!dpForm.date && !dpForm.amount ? "Date and amount are required." : !dpForm.date ? "Date is required." : "Amount is required.");
+      return;
+    }
+    setDpError("");
     const rec = { id: uid(), date: dpForm.date, amount: parseFloat(dpForm.amount) || 0, note: dpForm.note.trim() };
     upd({ downpaymentRecords: [...(prop.downpaymentRecords || []), rec].sort((a, b) => a.date.localeCompare(b.date)) });
     setDpForm({ date: "", amount: "", note: "" });
@@ -59,7 +65,11 @@ export default function HousingLoanTab() {
   const delDP = (recId) => prop && upd({ downpaymentRecords: (prop.downpaymentRecords || []).filter(r => r.id !== recId) });
 
   const addPR = () => {
-    if (!prop || !prForm.month || !prForm.claimAmount) return;
+    if (!prForm.month || !prForm.claimAmount) {
+      setPrError(!prForm.month && !prForm.claimAmount ? "Month and claim amount are required." : !prForm.month ? "Month is required." : "Claim amount is required.");
+      return;
+    }
+    setPrError("");
     const rec = { id: uid(), month: prForm.month, claimAmount: parseFloat(prForm.claimAmount) || 0, stage: prForm.stage.trim(), note: prForm.note.trim() };
     upd({ progressiveRecords: [...(prop.progressiveRecords || []), rec].sort((a, b) => a.month.localeCompare(b.month)) });
     setPrForm({ month: "", claimAmount: "", stage: "", note: "" });
@@ -429,7 +439,10 @@ export default function HousingLoanTab() {
             <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Note</label>
             <input className="hl-in" placeholder="e.g. Booking fee / 10% downpayment" value={dpForm.note} onChange={e => setDpForm(f => ({ ...f, note: e.target.value }))} />
           </div>
-          <button onClick={addDP} style={addBtnStyle}>+ Add</button>
+          <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 4 }}>
+            <button onClick={addDP} style={addBtnStyle}>+ Add</button>
+            {dpError && <span style={{ fontSize: 11, color: "#f87171", whiteSpace: "nowrap" }}>⚠ {dpError}</span>}
+          </div>
         </div>
         {(prop.downpaymentRecords || []).length > 0 ? (
           <div style={{ overflowX: "auto" }}>
@@ -499,7 +512,10 @@ export default function HousingLoanTab() {
               <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Note</label>
               <input className="hl-in" placeholder="Optional" value={prForm.note} onChange={e => setPrForm(f => ({ ...f, note: e.target.value }))} />
             </div>
-            <button onClick={addPR} style={addBtnStyle}>+ Add</button>
+            <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 4 }}>
+              <button onClick={addPR} style={addBtnStyle}>+ Add</button>
+              {prError && <span style={{ fontSize: 11, color: "#f87171", whiteSpace: "nowrap" }}>⚠ {prError}</span>}
+            </div>
           </div>
           {progressiveTimeline.length > 0 ? (
             <div style={{ overflowX: "auto" }}>
