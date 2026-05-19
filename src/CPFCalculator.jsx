@@ -147,7 +147,11 @@ export default function CPFCalculator() {
   const [maStart, setMaStart]   = useState(() => lsFloat("cpf_ma_start",       0));
   const [ceilingGrowth, setCeilingGrowth] = useState(() => lsFloat("cpf_ceiling_growth", 3.5));
   const [saShield, setSaShield]     = useState(() => lsFloat("cpf_sa_shield", 0));
-  const [saShieldOn, setSaShieldOn] = useState(() => lsFloat("cpf_sa_shield", 0) > 0);
+  const [saShieldOn, setSaShieldOn] = useState(() => {
+    // Prefer the dedicated boolean key; fall back to old behaviour for existing users
+    const explicit = localStorage.getItem("cpf_sa_shield_on");
+    return explicit !== null ? explicit === "true" : lsFloat("cpf_sa_shield", 0) > 0;
+  });
   const [activeTab, setActiveTab]   = useState(() => localStorage.getItem("active_tab") || "summary");
   const [pdfBusy, setPdfBusy]       = useState(false);
   const [pdfError, setPdfError]     = useState(null);
@@ -174,7 +178,8 @@ export default function CPFCalculator() {
   useEffect(() => { try { localStorage.setItem("cpf_sa_start",       saStart);                   } catch {} }, [saStart]);
   useEffect(() => { try { localStorage.setItem("cpf_ma_start",       maStart);                   } catch {} }, [maStart]);
   useEffect(() => { try { localStorage.setItem("cpf_ceiling_growth", ceilingGrowth);             } catch {} }, [ceilingGrowth]);
-  useEffect(() => { try { localStorage.setItem("cpf_sa_shield", saShieldOn ? saShield : 0);      } catch {} }, [saShield, saShieldOn]);
+  useEffect(() => { try { localStorage.setItem("cpf_sa_shield",    saShield);    } catch {} }, [saShield]);
+  useEffect(() => { try { localStorage.setItem("cpf_sa_shield_on", saShieldOn); } catch {} }, [saShieldOn]);
 
   // Increment syncTrigger whenever any persisted value changes so useCloudSync debounces an outbound write
   useEffect(() => { setSyncTrigger(n => n + 1); },
