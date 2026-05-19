@@ -56,9 +56,17 @@ export function useCloudSync(syncTrigger) {
             .maybeSingle();
 
           if (!error && profile?.data) {
-            writeLocalData(profile.data);
-            // Reload so all useState initialisers re-read from localStorage
-            window.location.reload();
+            // Only reload if the remote data differs from current local data.
+            // This avoids discarding unsaved local edits sitting in the debounce
+            // queue when the user signs in during rapid input.
+            const local = readLocalData();
+            const remoteJson = JSON.stringify(profile.data);
+            const localJson  = JSON.stringify(local);
+            if (remoteJson !== localJson) {
+              writeLocalData(profile.data);
+              // Reload so all useState initialisers re-read from localStorage
+              window.location.reload();
+            }
           }
         } catch (e) {
           setSyncError("Could not load cloud data: " + e.message);
