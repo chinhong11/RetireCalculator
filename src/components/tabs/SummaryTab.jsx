@@ -1,18 +1,27 @@
 import { useState, useEffect, useMemo } from "react";
 import { RM, USD, uid } from "../../lib/finance.js";
 
+function lsJson(key) {
+  try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : []; } catch { return []; }
+}
+
 export default function SummaryTab({ cpfData, yearsToProject, projectionData }) {
-  const properties = useMemo(() => {
-    try { const s = localStorage.getItem("hl_props_v1"); return s ? JSON.parse(s) : []; } catch { return []; }
-  }, []);
-  const stockHoldings = useMemo(() => {
-    try { const s = localStorage.getItem("stocks_v1"); return s ? JSON.parse(s) : []; } catch { return []; }
-  }, []);
-  const cryptoHoldings = useMemo(() => {
-    try { const s = localStorage.getItem("crypto_v1"); return s ? JSON.parse(s) : []; } catch { return []; }
-  }, []);
-  const myStockHoldings = useMemo(() => {
-    try { const s = localStorage.getItem("mystocks_v1"); return s ? JSON.parse(s) : []; } catch { return []; }
+  // Read once on mount; re-read whenever the tab becomes visible so data
+  // reflects edits made in other tabs during the same session.
+  const [properties,     setProperties]     = useState(() => lsJson("hl_props_v1"));
+  const [stockHoldings,  setStockHoldings]  = useState(() => lsJson("stocks_v1"));
+  const [cryptoHoldings, setCryptoHoldings] = useState(() => lsJson("crypto_v1"));
+  const [myStockHoldings, setMyStockHoldings] = useState(() => lsJson("mystocks_v1"));
+
+  useEffect(() => {
+    const refresh = () => {
+      setProperties(lsJson("hl_props_v1"));
+      setStockHoldings(lsJson("stocks_v1"));
+      setCryptoHoldings(lsJson("crypto_v1"));
+      setMyStockHoldings(lsJson("mystocks_v1"));
+    };
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
   }, []);
 
   const SGD = (n) => "S$" + Number(n || 0).toLocaleString("en-SG", { maximumFractionDigits: 0 });
