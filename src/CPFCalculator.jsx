@@ -473,58 +473,68 @@ export default function CPFCalculator() {
             {/* ③ Starting Balances (optional) */}
             <div style={{ background: "var(--card-bg)", borderRadius: 16, padding: 24, border: "1px solid var(--border)" }}>
               <StepLabel n={3} title="Starting Balances" optional />
-              <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 14, lineHeight: 1.6 }}>
-                Enter your actual balances from the CPF portal. The projection will start from these figures instead of $0.
+              <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 16, lineHeight: 1.7 }}>
+                Enter your actual CPF balances. The projection starts from these figures instead of $0.
               </div>
               {[
-                { key: "OA", label: "OA Balance (S$)",                                  value: oaStart, set: setOaStart, color: "#4ade80" },
+                { key: "OA", label: "OA Balance (S$)",                                   value: oaStart, set: setOaStart, color: "#4ade80" },
                 { key: age >= 55 ? "RA" : "SA", label: age >= 55 ? "RA Balance (S$)" : "SA Balance (S$)", value: saStart, set: setSaStart, color: age >= 55 ? "#a78bfa" : "#818cf8" },
-                { key: "MA", label: "MA Balance (S$)",                                  value: maStart, set: setMaStart, color: "#f472b6" },
+                { key: "MA", label: "MA Balance (S$)",                                   value: maStart, set: setMaStart, color: "#f472b6" },
               ].map(({ key, label, value, set, color }) => (
-                <div key={label} style={{ marginBottom: 14 }}>
-                  <label style={{ fontSize: 13, color: "var(--label)", fontWeight: 500, display: "flex", alignItems: "center", marginBottom: 6 }}>
+                <div key={label} style={{ marginBottom: 12 }}>
+                  <label style={{ fontSize: 12, color: "var(--label)", fontWeight: 600, display: "flex", alignItems: "center", marginBottom: 6 }}>
                     {label} <Hint text={GLOSSARY[key]} />
                   </label>
-                  <input
-                    type="number" min="0" value={value || ""} placeholder="0"
-                    onChange={e => set(parseFloat(e.target.value) || 0)}
-                    style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: `1px solid ${color}30`, background: `${color}08`, color: "var(--text)", fontSize: 14, fontFamily: "'DM Mono', monospace", outline: "none" }}
-                  />
+                  <div style={{ position: "relative" }}>
+                    <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, borderRadius: "8px 0 0 8px", background: color, opacity: 0.7 }} />
+                    <input
+                      type="number" min="0" value={value || ""} placeholder="0"
+                      onChange={e => set(parseFloat(e.target.value) || 0)}
+                      className="hl-in"
+                      style={{ paddingLeft: 14, fontFamily: "'DM Mono', monospace", fontSize: 14 }}
+                    />
+                  </div>
                 </div>
               ))}
               {(oaStart > 0 || saStart > 0 || maStart > 0) && (
-                <div style={{ fontSize: 12, color: "var(--accent)", marginTop: 4 }}>
-                  Starting balance: {fmtD(oaStart + saStart + maStart)}
+                <div style={{ marginTop: 10, padding: "8px 12px", borderRadius: 8, background: "var(--accent-subtle)", border: "1px solid var(--accent-border-c)", fontSize: 12, color: "var(--accent)", fontWeight: 600, fontFamily: "'DM Mono', monospace" }}>
+                  Total starting balance: {fmtD(oaStart + saStart + maStart)}
                 </div>
               )}
 
               {/* SA Shielding */}
               {age < 55 && (
                 <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
-                  <label style={{ display: "flex", alignItems: "center", gap: 8, cursor: "pointer", marginBottom: saShieldOn ? 10 : 0 }}>
+                  <label style={{ display: "flex", alignItems: "center", gap: 9, cursor: "pointer", marginBottom: saShieldOn ? 12 : 0 }}>
                     <input type="checkbox" checked={saShieldOn} onChange={e => setSaShieldOn(e.target.checked)}
-                      style={{ width: 15, height: 15, accentColor: "var(--accent)", cursor: "pointer" }} />
+                      style={{ width: 16, height: 16, accentColor: "var(--accent)", cursor: "pointer", flexShrink: 0 }} />
                     <span style={{ fontSize: 13, color: "var(--label)", fontWeight: 600, display: "flex", alignItems: "center" }}>
                       SA Shielding (CPFIS-SA) <Hint text={GLOSSARY["CPFIS-SA"]} />
                     </span>
                   </label>
                   {saShieldOn && (
                     <>
-                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 8, lineHeight: 1.6 }}>
-                        Invest this amount of SA into CPFIS before age 55. Only uninvested SA cash forms RA — the shield stays in CPFIS (growing at SA rate) and returns to your OA after 55.
+                      <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 10, lineHeight: 1.7 }}>
+                        Invest this amount into CPFIS before age 55 to protect it from the RA transfer. Proceeds return to OA at 55.
                       </div>
-                      <input
-                        type="number" min="0" max={saStart} placeholder="e.g. 40000" value={saShield || ""}
-                        onChange={e => setSaShield(Math.max(0, parseFloat(e.target.value) || 0))}
-                        style={{ width: "100%", padding: "9px 12px", borderRadius: 8, border: "1px solid rgba(129,140,248,0.3)", background: "rgba(129,140,248,0.06)", color: "var(--text)", fontSize: 14, fontFamily: "'DM Mono', monospace", outline: "none" }}
-                      />
+                      <div style={{ position: "relative" }}>
+                        <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, borderRadius: "8px 0 0 8px", background: "#818cf8", opacity: 0.7 }} />
+                        <input
+                          type="number" min="0" max={saStart} placeholder="e.g. 40,000" value={saShield || ""}
+                          onChange={e => setSaShield(Math.max(0, parseFloat(e.target.value) || 0))}
+                          className="hl-in"
+                          style={{ paddingLeft: 14, fontFamily: "'DM Mono', monospace", fontSize: 14 }}
+                        />
+                      </div>
                       {saShield > 0 && saStart > 0 && saShield > saStart && (
-                        <div style={{ fontSize: 11, color: "#fbbf24", marginTop: 4 }}>⚠ Shield exceeds SA balance — capped at {fmtD(saStart)}</div>
+                        <div style={{ fontSize: 11, color: "#fbbf24", marginTop: 6, display: "flex", alignItems: "center", gap: 5 }}>
+                          ⚠ Shield exceeds SA balance — capped at {fmtD(saStart)}
+                        </div>
                       )}
                       {saShield > 0 && (() => {
                         const raRow = projectionData.find(d => d.raFormed);
                         return raRow ? (
-                          <div style={{ fontSize: 11, color: "#818cf8", marginTop: 6, lineHeight: 1.6 }}>
+                          <div style={{ fontSize: 11, color: "#818cf8", marginTop: 8, lineHeight: 1.7, padding: "8px 10px", borderRadius: 8, background: "rgba(129,140,248,0.07)", border: "1px solid rgba(129,140,248,0.15)" }}>
                             At age 55: RA = {fmtD(raRow.ra)} · OA = {fmtD(raRow.oa)} (includes CPFIS proceeds)
                           </div>
                         ) : null;
