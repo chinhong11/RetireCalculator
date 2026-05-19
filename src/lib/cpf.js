@@ -211,7 +211,8 @@ export function projectYears({
         if (raFormed) raBalance += ov; else saBalance += ov;
       }
 
-      // 2. Advance age/salary
+      // 2. Advance age/salary before contributions so Year N shows the state
+      //    at the end of that year (age = starting_age + N). Same convention as EPF.
       currentSalary = currentSalary * (1 + annualIncrement / 100);
       currentAge    += 1;
       currentPRYear += 1;
@@ -230,7 +231,11 @@ export function projectYears({
         cpfisBalance  = 0;
       }
 
-      // 4. Extra CPF interest (OA capped at $20k towards combined threshold)
+      // 4. Extra CPF interest (CPF Board rules, effective 1 Jan 2016):
+      //    - Under 55: 1% p.a. on first $60k combined (OA capped at $20k).
+      //    - 55+:      2% on first $30k, then 1% on next $30k (OA still capped at $20k).
+      //    Balances above $60k (55+) or $60k (under 55) earn no extra interest.
+      //    Source: cpf.gov.sg/member/growing-your-savings/earning-higher-interest
       const oaCapped = Math.min(oaBalance, 20000);
       const combined = oaCapped + (raFormed ? raBalance : saBalance) + maBalance;
       let extra = 0;
