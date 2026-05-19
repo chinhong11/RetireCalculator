@@ -72,6 +72,10 @@ export default function HousingLoanTab() {
       setPrError(!prForm.month && !prForm.claimAmount ? "Month and claim amount are required." : !prForm.month ? "Month is required." : "Claim amount is required.");
       return;
     }
+    if ((prop.progressiveRecords || []).some(r => r.month === prForm.month)) {
+      setPrError(`A record for ${prForm.month} already exists. Duplicate months cause incorrect interest calculations.`);
+      return;
+    }
     setPrError("");
     const rec = { id: uid(), month: prForm.month, claimAmount: safeFloat(prForm.claimAmount), stage: prForm.stage.trim(), note: prForm.note.trim() };
     upd({ progressiveRecords: [...(prop.progressiveRecords || []), rec].sort((a, b) => a.month.localeCompare(b.month)) });
@@ -322,6 +326,13 @@ export default function HousingLoanTab() {
           </LabelField>
         </div>
       </div>
+
+      {/* Over-downpayment warning */}
+      {prop.purchasePrice > 0 && totalDownpaid > prop.purchasePrice && (
+        <div style={{ marginBottom: 16, padding: "10px 16px", borderRadius: 10, background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.3)", fontSize: 12, color: "#fbbf24", lineHeight: 1.6 }}>
+          ⚠ Total downpayments ({RM(totalDownpaid)}) exceed the purchase price ({RM(prop.purchasePrice)}). Loan amount is shown as RM 0. Check your records for duplicate or incorrect entries.
+        </div>
+      )}
 
       {/* Loan Summary Cards */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
