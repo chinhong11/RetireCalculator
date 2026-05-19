@@ -694,14 +694,27 @@ export default function CPFCalculator() {
           />
 
           {/* ── Footer ────────────────────────────────────────────────────── */}
-          <div style={{ padding: "16px 20px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7 }}>
-            <strong style={{ color: "var(--label)" }}>Disclaimer:</strong> This calculator is for estimation purposes only.
-            Rates are based on CPF Board's official tables effective 1 Jan 2026. OW ceiling $8,000/month.
-            MA is capped at the Basic Healthcare Sum (BHS, {fmtD(CPF_BHS_2026)} in 2026); excess overflows to SA/RA.
-            At 55, SA + OA top-up are transferred to RA up to the Full Retirement Sum (FRS, {fmtD(CPF_FRS_2026)} in 2026).
-            Both ceilings are projected forward using the FRS/BHS Growth Rate slider.
-            CPF LIFE payout is a rough estimate for the Standard Plan at ~6.3%/yr of RA at 65.
-            Always verify at <span style={{ color: "var(--accent)" }}>cpf.gov.sg</span>.
+          <div style={{
+            padding: "18px 20px", borderRadius: 12,
+            background: "var(--card-bg)", border: "1px solid var(--border)",
+            fontSize: 11, color: "var(--muted)", lineHeight: 1.8,
+            position: "relative", overflow: "hidden",
+          }}>
+            <div style={{ position: "absolute", top: 0, left: 0, right: 0, height: 2, background: "linear-gradient(90deg, var(--accent)44, var(--accent2)44)", borderRadius: "12px 12px 0 0" }} />
+            <div style={{ display: "flex", gap: 10, alignItems: "flex-start" }}>
+              <span style={{ fontSize: 14, flexShrink: 0, opacity: 0.6 }}>⚖️</span>
+              <div>
+                <span style={{ fontSize: 12, fontWeight: 700, color: "var(--label)", letterSpacing: "0.01em" }}>Disclaimer</span>
+                <span style={{ marginLeft: 6 }}>
+                  This calculator is for estimation purposes only. Rates are based on CPF Board's official tables effective 1 Jan 2026, OW ceiling $8,000/month.{" "}
+                  MA is capped at the BHS ({fmtD(CPF_BHS_2026)} in 2026); excess overflows to SA/RA.{" "}
+                  At 55, SA + OA top-up transfer to RA up to the FRS ({fmtD(CPF_FRS_2026)} in 2026).{" "}
+                  CPF LIFE payout is a rough estimate for the Standard Plan (~6.3%/yr of RA at 65).{" "}
+                  Always verify at{" "}
+                  <span style={{ color: "var(--accent)", fontWeight: 600 }}>cpf.gov.sg</span>.
+                </span>
+              </div>
+            </div>
           </div>
         </div>
 
