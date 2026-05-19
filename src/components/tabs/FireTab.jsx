@@ -95,7 +95,7 @@ export default function FireTab({ projectionData, yearsToProject }) {
 
   const fmtSGD  = v => "S$" + Math.round(v).toLocaleString();
   const fmtSGDM = v => v >= 1_000_000 ? "S$" + (v / 1_000_000).toFixed(2) + "M" : v >= 1000 ? "S$" + (v / 1000).toFixed(0) + "k" : fmtSGD(v);
-  const cardStyle  = { borderRadius: 12, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)" };
+  const cardStyle  = { borderRadius: 12, padding: "14px 18px", background: "var(--hover-bg)", border: "1px solid var(--border)" };
   const inputStyle = { background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", color: "var(--text)", fontSize: 13, width: "100%" };
   const FIRE_COLOR = "#f59e0b";
 
@@ -283,8 +283,9 @@ export default function FireTab({ projectionData, yearsToProject }) {
         </div>
       </div>
 
-      <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7 }}>
-        <strong style={{ color: "var(--label)" }}>Note:</strong> FIRE number = Annual expenses ÷ Safe withdrawal rate. The 4% rule originates from the Trinity Study (US equities, 30-year horizon). CPF and EPF are projected using their respective tab settings. Stocks and crypto use <strong style={{ color: "var(--label)" }}>{usingLivePrices ? "live market prices" : "cost basis (no prices fetched yet)"}</strong> — visit the portfolio tabs and fetch prices for a more accurate net worth. Housing equity and Fixed Deposits are static (no future appreciation). Cash savings are projected at a flat monthly rate. For planning purposes only — not financial advice.
+      <div style={{ padding: "12px 16px", borderRadius: 10, background: "var(--card-bg)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7, display: "flex", gap: 8, alignItems: "flex-start" }}>
+        <span style={{ flexShrink: 0, opacity: 0.5 }}>📌</span>
+        <span><strong style={{ color: "var(--label)" }}>Note:</strong> FIRE number = Annual expenses ÷ Safe withdrawal rate. The 4% rule originates from the Trinity Study (US equities, 30-year horizon). CPF and EPF are projected using their respective tab settings. Stocks and crypto use <strong style={{ color: "var(--label)" }}>{usingLivePrices ? "live market prices" : "cost basis (no prices fetched yet)"}</strong> — visit the portfolio tabs and fetch prices for a more accurate net worth. Housing equity and Fixed Deposits are static (no future appreciation). Cash savings are projected at a flat monthly rate. For planning purposes only — not financial advice.</span>
       </div>
     </div>
   );

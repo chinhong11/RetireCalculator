@@ -51,7 +51,7 @@ export default function FixedDepositsTab() {
     background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 8,
     padding: "6px 10px", color: "var(--text)", fontSize: 13, width: "100%",
   };
-  const cardStyle = { borderRadius: 12, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)" };
+  const cardStyle = { borderRadius: 12, padding: "14px 18px", background: "var(--hover-bg)", border: "1px solid var(--border)" };
   const FD_COLOR = "#34d399";
   const INT_COLOR = "#f59e0b";
 
@@ -229,8 +229,9 @@ export default function FixedDepositsTab() {
         </div>
       )}
 
-      <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7 }}>
-        <strong style={{ color: "var(--label)" }}>Note:</strong> Interest calculated using simple interest: <em>Principal × Rate × (Tenure / 12)</em>. This matches how most Malaysian banks calculate FD interest. All values in MYR. For personal record-keeping only — not financial advice.
+      <div style={{ padding: "12px 16px", borderRadius: 10, background: "var(--card-bg)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7, display: "flex", gap: 8, alignItems: "flex-start" }}>
+        <span style={{ flexShrink: 0, opacity: 0.5 }}>📌</span>
+        <span><strong style={{ color: "var(--label)" }}>Note:</strong> Interest calculated using simple interest: <em>Principal × Rate × (Tenure / 12)</em>. This matches how most Malaysian banks calculate FD interest. All values in MYR. For personal record-keeping only — not financial advice.</span>
       </div>
     </div>
   );

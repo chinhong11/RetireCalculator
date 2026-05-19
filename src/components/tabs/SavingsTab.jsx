@@ -80,7 +80,7 @@ export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly,
   }, [projectionData, annualSavings, startCash, cashReturn]);
 
   const fmtSGD   = v => "S$" + Math.round(v).toLocaleString();
-  const cardStyle  = { borderRadius: 12, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)" };
+  const cardStyle  = { borderRadius: 12, padding: "14px 18px", background: "var(--hover-bg)", border: "1px solid var(--border)" };
   const inputStyle = { background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", color: "var(--text)", fontSize: 13, width: "100%" };
 
   return (
@@ -388,8 +388,9 @@ export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly,
         </div>
       )}
 
-      <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7 }}>
-        <strong style={{ color: "var(--label)" }}>Note:</strong> Savings rate = (Income − Expenses) ÷ Income. The 20% benchmark is a widely-used personal finance guideline. Cash projection uses FV of lump sum plus FV of annual contributions at the chosen return rate (0% = simple accumulation). Goals check uses cash savings only; CPF is shown separately. FX for non-SGD goals uses the rates set in the Net Worth tab. For personal planning only — not financial advice.
+      <div style={{ padding: "12px 16px", borderRadius: 10, background: "var(--card-bg)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7, display: "flex", gap: 8, alignItems: "flex-start" }}>
+        <span style={{ flexShrink: 0, opacity: 0.5 }}>📌</span>
+        <span><strong style={{ color: "var(--label)" }}>Note:</strong> Savings rate = (Income − Expenses) ÷ Income. The 20% benchmark is a widely-used personal finance guideline. Cash projection uses FV of lump sum plus FV of annual contributions at the chosen return rate (0% = simple accumulation). Goals check uses cash savings only; CPF is shown separately. FX for non-SGD goals uses the rates set in the Net Worth tab. For personal planning only — not financial advice.</span>
       </div>
     </div>
   );

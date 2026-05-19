@@ -132,7 +132,7 @@ export default function NetWorthTab({ projectionData, yearsToProject }) {
 
   const fmtSGD  = v => "S$" + Math.round(v).toLocaleString();
   const inputStyle = { background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", color: "var(--text)", fontSize: 13, width: "100%", maxWidth: 140 };
-  const cardStyle  = { borderRadius: 12, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)" };
+  const cardStyle  = { borderRadius: 12, padding: "14px 18px", background: "var(--hover-bg)", border: "1px solid var(--border)" };
 
   const SERIES = [
     { key: "cpf",      label: "CPF (SGD)",             color: "#6ee7b7", note: "projected" },
@@ -280,8 +280,9 @@ export default function NetWorthTab({ projectionData, yearsToProject }) {
         </div>
       </div>
 
-      <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7 }}>
-        <strong style={{ color: "var(--label)" }}>Note:</strong> Stocks and crypto use <strong style={{ color: "var(--label)" }}>live market prices</strong> when available (fetched in the portfolio tabs) — labelled <span style={{ color: "#6ee7b7" }}>● live</span> in the legend. When no prices have been fetched yet, cost basis is used instead. CPF and EPF are projected year-by-year. Housing equity reflects downpayments recorded. FX rates are user-defined. All snapshot values are flat (no future appreciation assumed). For personal planning only — not financial advice.
+      <div style={{ padding: "12px 16px", borderRadius: 10, background: "var(--card-bg)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7, display: "flex", gap: 8, alignItems: "flex-start" }}>
+        <span style={{ flexShrink: 0, opacity: 0.5 }}>📌</span>
+        <span><strong style={{ color: "var(--label)" }}>Note:</strong> Stocks and crypto use <strong style={{ color: "var(--label)" }}>live market prices</strong> when available (fetched in the portfolio tabs) — labelled <span style={{ color: "#6ee7b7" }}>● live</span> in the legend. When no prices have been fetched yet, cost basis is used instead. CPF and EPF are projected year-by-year. Housing equity reflects downpayments recorded. FX rates are user-defined. All snapshot values are flat (no future appreciation assumed). For personal planning only — not financial advice.</span>
       </div>
     </div>
   );
