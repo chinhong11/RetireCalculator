@@ -264,7 +264,7 @@ export default function CryptoTab() {
                     </select>
                   </div>
                   {dcaPosition ? (
-                    <div style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)", fontSize: 13, lineHeight: 1.9 }}>
+                    <div style={{ padding: "12px 14px", borderRadius: 10, background: "var(--hover-bg)", border: "1px solid var(--border)", fontSize: 13, lineHeight: 1.9 }}>
                       <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", columnGap: 14 }}>
                         <span style={{ color: "var(--muted)", fontSize: 12 }}>Amount held</span>
                         <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 600 }}>{dcaPosition.totalAmount.toPrecision(8).replace(/\.?0+$/, "")}</span>
@@ -345,7 +345,7 @@ export default function CryptoTab() {
                         const pnlPct = ((live - dcaResult.newAvgCost) / dcaResult.newAvgCost) * 100;
                         const pnl = (live - dcaResult.newAvgCost) * dcaResult.newAmount;
                         return (
-                          <div style={{ marginTop: 10, padding: "10px 14px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 12 }}>
+                          <div style={{ marginTop: 10, padding: "10px 14px", borderRadius: 8, background: "var(--hover-bg)", border: "1px solid var(--border)", fontSize: 12 }}>
                             <div style={{ color: "var(--muted)", marginBottom: 3 }}>P&amp;L at live price ({fmtCoin(live)})</div>
                             <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, color: pnlPct >= 0 ? "#4ade80" : "#f87171" }}>
                               {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}% &nbsp;·&nbsp; {pnl >= 0 ? "+" : ""}{USD(pnl)}
@@ -489,8 +489,9 @@ export default function CryptoTab() {
         </div>
       )}
 
-      <div style={{ padding: "14px 18px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7 }}>
-        <strong style={{ color: "var(--label)" }}>Note:</strong> Prices are fetched from CoinGecko (free public API). P&L is unrealised gain/loss based on your cost basis (amount × buy price + fees). All values in USD. For unlisted tokens, enter the CoinGecko coin ID (e.g. "wrapped-bitcoin") in the Coin field. For personal record-keeping only — not financial advice.
+      <div style={{ padding: "14px 18px", borderRadius: 12, background: "var(--card-bg)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7, display: "flex", gap: 8, alignItems: "flex-start" }}>
+        <span style={{ flexShrink: 0, opacity: 0.5 }}>📌</span>
+        <span><strong style={{ color: "var(--label)" }}>Note:</strong> Prices are fetched from CoinGecko (free public API). P&amp;L is unrealised gain/loss based on your cost basis (amount × buy price + fees). All values in USD. For unlisted tokens, enter the CoinGecko coin ID (e.g. "wrapped-bitcoin") in the Coin field. For personal record-keeping only — not financial advice.</span>
       </div>
     </div>
   );

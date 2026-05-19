@@ -37,7 +37,7 @@ export default function EPFTab() {
   const fmtRM = v => "RM " + Math.round(v).toLocaleString();
   const fmtRM2 = v => "RM " + v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 
-  const cardStyle = { borderRadius: 12, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)" };
+  const cardStyle = { borderRadius: 12, padding: "14px 18px", background: "var(--hover-bg)", border: "1px solid var(--border)" };
   const inputStyle = { background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", color: "var(--text)", fontSize: 13, width: "100%" };
   const subTabBtn = (id, label) => (
     <button
@@ -108,7 +108,7 @@ export default function EPFTab() {
             { label: "Total Monthly", value: monthly.total, color: "#fff" },
             { label: "Take-Home Pay", value: monthly.takeHome, color: EPF_PER },
           ].map(({ label, value, color }) => (
-            <div key={label} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 10, padding: "10px 14px" }}>
+            <div key={label} style={{ background: "var(--hover-bg)", borderRadius: 10, padding: "10px 14px" }}>
               <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 4 }}>{label}</div>
               <div style={{ fontSize: 15, fontWeight: 700, color }}>{fmtRM(value)}</div>
             </div>
@@ -256,8 +256,9 @@ export default function EPFTab() {
       )}
 
       {/* Disclaimer */}
-      <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7 }}>
-        <strong style={{ color: "var(--label)" }}>Note (EPF Malaysia):</strong> Employee contribution is 11% for members under 60 (5.5% reduced rate applies at 60 and above). Employer contributes 12% for wages above RM 5,000 or 13% for RM 5,000 and below, dropping to 6% at 60 and above. Post-2024 restructure: contributions split as Persaraan 75% / Sejahtera 15% / Fleksibel 10%. Dividend is projected at a flat rate applied to average balance. For personal planning only — not financial advice.
+      <div style={{ padding: "12px 16px", borderRadius: 10, background: "var(--card-bg)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7, display: "flex", gap: 8, alignItems: "flex-start" }}>
+        <span style={{ flexShrink: 0, opacity: 0.5 }}>📌</span>
+        <span><strong style={{ color: "var(--label)" }}>Note (EPF Malaysia):</strong> Employee contribution is 11% for members under 60 (5.5% reduced rate applies at 60 and above). Employer contributes 12% for wages above RM 5,000 or 13% for RM 5,000 and below, dropping to 6% at 60 and above. Post-2024 restructure: contributions split as Persaraan 75% / Sejahtera 15% / Fleksibel 10%. Dividend is projected at a flat rate applied to average balance. For personal planning only — not financial advice.</span>
       </div>
     </div>
   );

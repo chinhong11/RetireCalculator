@@ -329,8 +329,9 @@ export default function StocksTab() {
         </div>
       )}
 
-      <div style={{ padding: "14px 18px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7 }}>
-        <strong style={{ color: "var(--label)" }}>Note:</strong> Prices are fetched live from Yahoo Finance and may be delayed up to 15–20 minutes during market hours. P&L shown is unrealised gain/loss based on your cost basis (shares × buy price + fees). All values in USD. For personal record-keeping only — not financial advice.
+      <div style={{ padding: "14px 18px", borderRadius: 12, background: "var(--card-bg)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7, display: "flex", gap: 8, alignItems: "flex-start" }}>
+        <span style={{ flexShrink: 0, opacity: 0.5 }}>📌</span>
+        <span><strong style={{ color: "var(--label)" }}>Note:</strong> Prices are fetched live from Yahoo Finance and may be delayed up to 15–20 minutes during market hours. P&amp;L shown is unrealised gain/loss based on your cost basis (shares × buy price + fees). All values in USD. For personal record-keeping only — not financial advice.</span>
       </div>
     </div>
   );
