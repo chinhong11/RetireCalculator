@@ -28,50 +28,54 @@ import SummaryTab           from "./components/tabs/SummaryTab.jsx";
 // ─── Theme definitions ────────────────────────────────────────────────────────
 const THEMES = {
   dark: {
-    "--bg": "#0a0e17",
-    "--card-bg": "rgba(255,255,255,0.03)",
-    "--border": "rgba(255,255,255,0.08)",
+    "--bg": "#080c14",
+    "--card-bg": "rgba(255,255,255,0.035)",
+    "--card-bg-hover": "rgba(255,255,255,0.055)",
+    "--border": "rgba(255,255,255,0.09)",
     "--text": "#e8eaf0",
     "--label": "#a0a8c0",
-    "--muted": "#5a6380",
+    "--muted": "#556070",
     "--accent": "#6ee7b7",
     "--accent2": "#818cf8",
-    "--track": "rgba(255,255,255,0.06)",
-    "--tooltip-bg": "rgba(15,20,35,0.92)",
-    "--input-bg": "rgba(255,255,255,0.04)",
-    "--hover-bg": "rgba(255,255,255,0.04)",
-    "--option-bg": "#0a0e17",
+    "--track": "rgba(255,255,255,0.07)",
+    "--tooltip-bg": "rgba(10,14,24,0.96)",
+    "--input-bg": "rgba(255,255,255,0.05)",
+    "--hover-bg": "rgba(255,255,255,0.05)",
+    "--option-bg": "#080c14",
     "--option-color": "#e8eaf0",
-    "--accent-subtle": "rgba(110,231,183,0.1)",
-    "--accent-border-c": "rgba(110,231,183,0.2)",
-    "--accent-chip": "rgba(110,231,183,0.12)",
-    "--accent-shadow": "rgba(110,231,183,0.15)",
-    "--row-alt": "rgba(255,255,255,0.01)",
-    "--header-tint": "rgba(110,231,183,0.06)",
+    "--accent-subtle": "rgba(110,231,183,0.08)",
+    "--accent-border-c": "rgba(110,231,183,0.22)",
+    "--accent-chip": "rgba(110,231,183,0.11)",
+    "--accent-shadow": "rgba(110,231,183,0.18)",
+    "--row-alt": "rgba(255,255,255,0.018)",
+    "--header-tint": "rgba(110,231,183,0.05)",
     "--grid-line": "rgba(255,255,255,0.04)",
+    "--step-bg": "rgba(110,231,183,0.1)",
   },
   light: {
     "--bg": "#f0f4f8",
     "--card-bg": "#ffffff",
-    "--border": "rgba(0,0,0,0.09)",
+    "--card-bg-hover": "#fafbfd",
+    "--border": "rgba(0,0,0,0.08)",
     "--text": "#111827",
     "--label": "#374151",
     "--muted": "#6b7280",
     "--accent": "#059669",
     "--accent2": "#4f46e5",
-    "--track": "rgba(0,0,0,0.1)",
-    "--tooltip-bg": "rgba(255,255,255,0.97)",
-    "--input-bg": "rgba(0,0,0,0.03)",
-    "--hover-bg": "rgba(0,0,0,0.04)",
+    "--track": "rgba(0,0,0,0.09)",
+    "--tooltip-bg": "rgba(255,255,255,0.98)",
+    "--input-bg": "rgba(0,0,0,0.025)",
+    "--hover-bg": "rgba(0,0,0,0.035)",
     "--option-bg": "#ffffff",
     "--option-color": "#111827",
-    "--accent-subtle": "rgba(5,150,105,0.08)",
-    "--accent-border-c": "rgba(5,150,105,0.2)",
-    "--accent-chip": "rgba(5,150,105,0.1)",
-    "--accent-shadow": "rgba(5,150,105,0.15)",
+    "--accent-subtle": "rgba(5,150,105,0.07)",
+    "--accent-border-c": "rgba(5,150,105,0.22)",
+    "--accent-chip": "rgba(5,150,105,0.09)",
+    "--accent-shadow": "rgba(5,150,105,0.18)",
     "--row-alt": "rgba(0,0,0,0.015)",
     "--header-tint": "rgba(5,150,105,0.04)",
     "--grid-line": "rgba(0,0,0,0.06)",
+    "--step-bg": "rgba(5,150,105,0.09)",
   },
 };
 
@@ -106,16 +110,17 @@ const GLOSSARY = {
 // ─── Local components ─────────────────────────────────────────────────────────
 function StepLabel({ n, title, optional }) {
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 16 }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 18 }}>
       <span style={{
         display: "inline-flex", alignItems: "center", justifyContent: "center",
-        width: 20, height: 20, borderRadius: "50%",
-        background: "var(--accent-chip)", border: "1px solid var(--accent-border-c)",
-        fontSize: 11, fontWeight: 700, color: "var(--accent)", flexShrink: 0,
+        width: 22, height: 22, borderRadius: "50%",
+        background: "var(--step-bg)", border: "1.5px solid var(--accent-border-c)",
+        fontSize: 11, fontWeight: 800, color: "var(--accent)", flexShrink: 0,
+        boxShadow: "0 0 8px var(--accent-shadow)",
       }}>{n}</span>
-      <span style={{ fontSize: 11, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted)", fontWeight: 600 }}>
+      <span style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.13em", color: "var(--muted)", fontWeight: 700 }}>
         {title}
-        {optional && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 400, textTransform: "none", letterSpacing: 0 }}>(optional)</span>}
+        {optional && <span style={{ marginLeft: 6, fontSize: 10, fontWeight: 400, textTransform: "none", letterSpacing: 0, opacity: 0.7 }}>(optional)</span>}
       </span>
     </div>
   );
@@ -246,34 +251,59 @@ export default function CPFCalculator() {
       transition: "background 0.2s, color 0.2s",
     }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=DM+Mono:wght@400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Instrument+Sans:ital,wght@0,400;0,500;0,600;0,700;0,800;1,400&family=DM+Mono:wght@400;500&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
-        input[type=range] { -webkit-appearance: none; height: 6px; border-radius: 4px; background: var(--track); outline: none; }
-        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg); box-shadow: 0 0 10px var(--accent-shadow); }
-        input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2px solid var(--bg); }
-        .tab-btn { padding: 10px 20px; border-radius: 10px; border: 1px solid transparent; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; font-family: inherit; }
+
+        /* Range sliders */
+        input[type=range] { -webkit-appearance: none; height: 4px; border-radius: 4px; background: var(--track); outline: none; cursor: pointer; width: 100%; }
+        input[type=range]::-webkit-slider-thumb { -webkit-appearance: none; width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2.5px solid var(--bg); box-shadow: 0 0 0 1.5px var(--accent), 0 2px 8px var(--accent-shadow); transition: transform 0.15s ease; }
+        input[type=range]::-webkit-slider-thumb:hover { transform: scale(1.2); }
+        input[type=range]::-moz-range-thumb { width: 18px; height: 18px; border-radius: 50%; background: var(--accent); cursor: pointer; border: 2.5px solid var(--bg); box-shadow: 0 0 0 1.5px var(--accent); }
+
+        /* Tab buttons */
+        .tab-btn { padding: 8px 16px; border-radius: 9px; border: none; background: transparent; color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; transition: background 0.15s ease, color 0.15s ease, box-shadow 0.15s ease; font-family: inherit; white-space: nowrap; }
         .tab-btn:hover { color: var(--text); background: var(--hover-bg); }
-        .tab-btn.active { background: var(--accent-subtle); color: var(--accent); border-color: var(--accent-border-c); }
-        .input-field { width: 100%; padding: 10px 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font-size: 15px; font-family: 'DM Mono', monospace; font-weight: 500; outline: none; transition: border 0.2s; }
+        .tab-btn.active { background: var(--accent-chip); color: var(--accent); box-shadow: 0 0 0 1px var(--accent-border-c), 0 2px 12px var(--accent-shadow); }
+
+        /* Main number inputs */
+        .input-field { width: 100%; padding: 11px 14px; border-radius: 10px; border: 1.5px solid var(--border); background: var(--input-bg); color: var(--text); font-size: 15px; font-family: 'DM Mono', monospace; font-weight: 500; outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease; }
         .input-field:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-shadow); }
-        .pr-chip { display: inline-flex; align-items: center; padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.2s; border: 1px solid var(--border); background: transparent; color: var(--muted); font-family: inherit; }
-        .pr-chip.selected { background: var(--accent-chip); color: var(--accent); border-color: var(--accent-border-c); }
-        .section-title { font-size: 11px; text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted); font-weight: 600; margin-bottom: 16px; }
-        .hl-in { width: 100%; padding: 8px 12px; border-radius: 8px; border: 1px solid var(--border); background: var(--input-bg); color: var(--text); font-size: 13px; font-family: inherit; outline: none; transition: border 0.2s; -webkit-appearance: none; appearance: none; }
+        .input-field::placeholder { color: var(--muted); opacity: 0.55; }
+
+        /* PR year chips */
+        .pr-chip { display: inline-flex; align-items: center; padding: 7px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: all 0.15s ease; border: 1.5px solid var(--border); background: transparent; color: var(--muted); font-family: inherit; }
+        .pr-chip:hover { color: var(--text); border-color: var(--accent-border-c); }
+        .pr-chip.selected { background: var(--accent-chip); color: var(--accent); border-color: var(--accent-border-c); box-shadow: 0 0 14px var(--accent-shadow); }
+
+        /* Section titles */
+        .section-title { font-size: 10px; text-transform: uppercase; letter-spacing: 0.12em; color: var(--muted); font-weight: 700; margin-bottom: 16px; }
+
+        /* Housing loan / generic inputs */
+        .hl-in { width: 100%; padding: 9px 12px; border-radius: 8px; border: 1.5px solid var(--border); background: var(--input-bg); color: var(--text); font-size: 13px; font-family: inherit; outline: none; transition: border-color 0.15s ease, box-shadow 0.15s ease; -webkit-appearance: none; appearance: none; }
         .hl-in:focus { border-color: var(--accent); box-shadow: 0 0 0 2px var(--accent-shadow); }
+        .hl-in::placeholder { color: var(--muted); opacity: 0.55; }
         .hl-in option { background: var(--option-bg); color: var(--option-color); }
-        .sidebar-scroll::-webkit-scrollbar { width: 4px; }
+
+        /* Sidebar scrollbar */
+        .sidebar-scroll::-webkit-scrollbar { width: 3px; }
         .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }
         .sidebar-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+        /* Advanced toggle */
         .adv-toggle { display: flex; align-items: center; justify-content: space-between; width: 100%; background: transparent; border: none; cursor: pointer; padding: 0; font-family: inherit; }
         .adv-toggle:focus-visible { outline: 2px solid var(--accent); border-radius: 4px; }
+
+        /* Hide scrollbar for tab rows */
+        .tab-row { scrollbar-width: none; -ms-overflow-style: none; }
+        .tab-row::-webkit-scrollbar { display: none; }
+
         @media (max-width: 800px) {
           .layout-grid { grid-template-columns: 1fr !important; }
           .sidebar-sticky { position: static !important; }
           .sidebar-scroll { max-height: none !important; overflow-y: visible !important; }
         }
         @media (max-width: 480px) {
-          .tab-btn { padding: 7px 12px; font-size: 12px; }
+          .tab-btn { padding: 6px 12px; font-size: 12px; }
           .mobile-h1 { font-size: 22px !important; }
           .mobile-pad { padding: 20px 16px 16px !important; }
           .mobile-inner { padding: 0 12px !important; }
@@ -282,70 +312,76 @@ export default function CPFCalculator() {
 
       {/* ── Header ──────────────────────────────────────────────────────── */}
       <div className="mobile-pad" style={{
-        padding: "32px 24px 24px",
-        background: `linear-gradient(180deg, ${tv["--header-tint"]} 0%, transparent 100%)`,
+        padding: "28px 24px 22px",
+        background: `linear-gradient(160deg, ${tv["--header-tint"]} 0%, transparent 60%)`,
         borderBottom: "1px solid var(--border)",
         marginBottom: 24,
       }}>
         <div style={{ maxWidth: 1140, margin: "0 auto" }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, flexWrap: "wrap" }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 6 }}>
-              <div style={{ width: 8, height: 8, borderRadius: "50%", background: "var(--accent)" }} />
-              <span style={{ fontSize: 12, fontWeight: 600, color: "var(--accent)", letterSpacing: "0.08em", textTransform: "uppercase" }}>
+
+          {/* Top row: badge + actions */}
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", marginBottom: 14 }}>
+            {/* Brand badge */}
+            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <span style={{
+                display: "inline-flex", alignItems: "center", gap: 6,
+                padding: "4px 12px", borderRadius: 20,
+                background: "var(--accent-chip)", border: "1px solid var(--accent-border-c)",
+                fontSize: 11, fontWeight: 700, color: "var(--accent)", letterSpacing: "0.07em", textTransform: "uppercase",
+              }}>
+                <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--accent)", display: "inline-block" }} />
                 Singapore 2026
               </span>
             </div>
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-              {pdfError && (
-                <span style={{ fontSize: 11, color: "#f87171", fontWeight: 500 }}>⚠ {pdfError}</span>
-              )}
-              {syncError && (
-                <span style={{ fontSize: 11, color: "#fbbf24", fontWeight: 500 }}>⚠ {syncError}</span>
-              )}
-              {/* Cloud sync / auth button */}
+
+            {/* Action buttons */}
+            <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+              {pdfError  && <span style={{ fontSize: 11, color: "#f87171",  fontWeight: 500 }}>⚠ {pdfError}</span>}
+              {syncError && <span style={{ fontSize: 11, color: "#fbbf24",  fontWeight: 500 }}>⚠ {syncError}</span>}
+
               {user ? (
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  {syncing && (
-                    <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 500 }}>☁ Syncing…</span>
-                  )}
-                  {!syncing && (
-                    <span style={{ fontSize: 11, color: "var(--muted)" }} title={user.email}>
-                      ☁ {user.email.length > 20 ? user.email.slice(0, 18) + "…" : user.email}
-                    </span>
-                  )}
-                  <button
-                    onClick={signOut}
-                    title="Sign out"
-                    style={{ background: "var(--input-bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontSize: 11, fontWeight: 600, color: "var(--muted)" }}
-                  >Sign out</button>
+                  {syncing
+                    ? <span style={{ fontSize: 11, color: "var(--accent)", fontWeight: 500 }}>☁ Syncing…</span>
+                    : <span style={{ fontSize: 11, color: "var(--muted)" }} title={user.email}>
+                        ☁ {user.email.length > 20 ? user.email.slice(0, 18) + "…" : user.email}
+                      </span>
+                  }
+                  <button onClick={signOut} title="Sign out" style={{ background: "var(--input-bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 11, fontWeight: 600, color: "var(--muted)", fontFamily: "inherit" }}>
+                    Sign out
+                  </button>
                 </div>
               ) : (
-                <button
-                  onClick={() => setShowAuthModal(true)}
-                  title="Sign in to sync your data to the cloud"
-                  style={{ background: "var(--accent-subtle)", border: "1px solid var(--accent-border-c)", borderRadius: 8, padding: "6px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--accent)", display: "flex", alignItems: "center", gap: 5 }}
-                >☁ Sign in</button>
+                <button onClick={() => setShowAuthModal(true)} title="Sign in to sync your data to the cloud"
+                  style={{ background: "var(--accent-subtle)", border: "1px solid var(--accent-border-c)", borderRadius: 8, padding: "6px 14px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--accent)", display: "flex", alignItems: "center", gap: 5, fontFamily: "inherit" }}>
+                  ☁ Sign in
+                </button>
               )}
-              <button
-                onClick={() => setTheme(t => t === "dark" ? "light" : "dark")}
+
+              <button onClick={() => setTheme(t => t === "dark" ? "light" : "dark")}
                 title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
-                style={{ background: "var(--input-bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontSize: 15, lineHeight: 1, color: "var(--text)" }}
-              >{theme === "dark" ? "☀️" : "🌙"}</button>
-              <button
-                onClick={handleExportPdf} disabled={pdfBusy}
-                title="Export projection as PDF"
-                style={{ background: "var(--input-bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 12px", cursor: pdfBusy ? "default" : "pointer", fontSize: 12, fontWeight: 600, color: pdfBusy ? "var(--muted)" : "var(--accent)", opacity: pdfBusy ? 0.6 : 1, display: "flex", alignItems: "center", gap: 5 }}
-              >{pdfBusy ? "⏳ Generating…" : "⬇ PDF"}</button>
+                style={{ background: "var(--input-bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", cursor: "pointer", fontSize: 15, lineHeight: 1, color: "var(--text)" }}>
+                {theme === "dark" ? "☀️" : "🌙"}
+              </button>
+
+              <button onClick={handleExportPdf} disabled={pdfBusy} title="Export projection as PDF"
+                style={{ background: "var(--input-bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 14px", cursor: pdfBusy ? "default" : "pointer", fontSize: 12, fontWeight: 600, color: pdfBusy ? "var(--muted)" : "var(--accent)", opacity: pdfBusy ? 0.6 : 1, display: "flex", alignItems: "center", gap: 5, fontFamily: "inherit" }}>
+                {pdfBusy ? "⏳ Generating…" : "⬇ PDF"}
+              </button>
             </div>
           </div>
-          <h1 className="mobile-h1" style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.02em", lineHeight: 1.2 }}>
-            CPF Contribution<br />Calculator
+
+          {/* Title + subtitle */}
+          <h1 className="mobile-h1" style={{ fontSize: 30, fontWeight: 800, letterSpacing: "-0.025em", lineHeight: 1.15, color: "var(--text)" }}>
+            CPF Contribution Calculator
           </h1>
-          <p style={{ color: "var(--muted)", fontSize: 14, marginTop: 8, lineHeight: 1.5 }}>
-            For Permanent Residents · OW ceiling $8,000 · Based on official CPF rates
+          <p style={{ color: "var(--muted)", fontSize: 13, marginTop: 6, lineHeight: 1.6 }}>
+            For Permanent Residents · OW ceiling $8,000 · Rates effective 1 Jan 2026
           </p>
-          <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid var(--border)" }}>
-            <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 8, textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600 }}>Data Backup</div>
+
+          {/* Data backup strip */}
+          <div style={{ marginTop: 14, paddingTop: 14, borderTop: "1px solid var(--border)", display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700 }}>Backup</span>
             <BackupBar />
           </div>
         </div>
@@ -412,11 +448,11 @@ export default function CPFCalculator() {
                   {advancedSummary}
                 </span>
                 <span style={{
-                  fontSize: 10, color: "var(--accent)", fontWeight: 600,
-                  border: "1px solid var(--accent-border-c)", borderRadius: 6,
-                  padding: "2px 8px", marginLeft: 8, whiteSpace: "nowrap",
+                  fontSize: 10, color: "var(--accent)", fontWeight: 700,
+                  background: "var(--accent-chip)", border: "1px solid var(--accent-border-c)",
+                  borderRadius: 6, padding: "2px 10px", marginLeft: 8, whiteSpace: "nowrap",
                 }}>
-                  {advancedOpen ? "▲ Less" : "▼ More"}
+                  {advancedOpen ? "▲ Less" : "▼ Expand"}
                 </span>
               </button>
               <div style={{
@@ -509,102 +545,91 @@ export default function CPFCalculator() {
         <div style={{ minWidth: 0 }}>
 
           {/* ── Sticky nav: result strip + tab bar ────────────────────────── */}
-          <div style={{ position: "sticky", top: 0, zIndex: 10, background: "var(--bg)", paddingBottom: 12 }}>
+          <div style={{ position: "sticky", top: 0, zIndex: 10, background: "var(--bg)", paddingBottom: 14 }}>
 
             {/* First-run welcome banner */}
             {showWelcome && (
               <div style={{
                 display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-                marginBottom: 10, padding: "10px 14px", borderRadius: 10,
+                marginBottom: 10, padding: "10px 16px", borderRadius: 10,
                 background: "var(--accent-subtle)", border: "1px solid var(--accent-border-c)",
                 fontSize: 12, color: "var(--label)", lineHeight: 1.5,
               }}>
                 <span>👆 These are example values — enter your salary and age in the sidebar to personalise your projection.</span>
-                <button
-                  onClick={() => setShowWelcome(false)}
-                  style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--muted)", fontSize: 16, lineHeight: 1, padding: 0, flexShrink: 0 }}
-                  aria-label="Dismiss"
-                >×</button>
+                <button onClick={() => setShowWelcome(false)}
+                  style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--muted)", fontSize: 18, lineHeight: 1, padding: 0, flexShrink: 0 }}
+                  aria-label="Dismiss">×</button>
               </div>
             )}
 
             {/* Live result strip */}
             <div style={{
-              display: "flex", gap: 12, marginBottom: 12,
-              padding: "12px 18px",
-              background: "var(--card-bg)",
-              border: "1px solid var(--border)",
-              borderRadius: 14,
-              flexWrap: "wrap",
+              display: "flex", gap: 0, marginBottom: 14,
+              background: "var(--card-bg)", border: "1px solid var(--border)",
+              borderRadius: 14, overflow: "hidden", flexWrap: "wrap",
             }}>
               {[
-                { label: `Total CPF · ${yearsToProject} yr`, value: fmtD(finalData.total),     color: "var(--accent)"  },
-                { label: "Monthly Take-Home",                 value: fmtD(monthly.takeHome),     color: "var(--text)"    },
-                { label: "Total CPF Contrib/mo",              value: fmtD(monthly.totalContrib), color: "var(--accent2)" },
-              ].map(({ label, value, color }) => (
-                <div key={label} style={{ flex: "1 1 160px", minWidth: 0 }}>
-                  <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.08em", fontWeight: 600, marginBottom: 3 }}>
+                { label: `Total CPF · ${yearsToProject} yr`, value: fmtD(finalData.total),     color: "var(--accent)",  border: false },
+                { label: "Monthly Take-Home",                 value: fmtD(monthly.takeHome),     color: "var(--text)",    border: true  },
+                { label: "CPF Contribution / mo",             value: fmtD(monthly.totalContrib), color: "var(--accent2)", border: true  },
+              ].map(({ label, value, color, border }) => (
+                <div key={label} style={{
+                  flex: "1 1 160px", minWidth: 0,
+                  padding: "14px 20px",
+                  borderLeft: border ? "1px solid var(--border)" : "none",
+                }}>
+                  <div style={{ fontSize: 10, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.1em", fontWeight: 700, marginBottom: 4 }}>
                     {label}
                   </div>
-                  <div style={{ fontSize: 18, fontWeight: 800, color, fontFamily: "'DM Mono', monospace", lineHeight: 1.2 }}>
+                  <div style={{ fontSize: 20, fontWeight: 800, color, fontFamily: "'DM Mono', monospace", lineHeight: 1.2 }}>
                     {value}
                   </div>
                 </div>
               ))}
             </div>
 
-            {/* Tab bar */}
-            <div
-            role="tablist"
-            aria-label="Calculator sections"
-            style={{ display: "flex", gap: 8, marginBottom: 20, flexWrap: "wrap", alignItems: "center" }}
-            onKeyDown={(e) => {
-              const ids = TABS.map(([id]) => id);
-              const cur = ids.indexOf(activeTab);
-              if (e.key === "ArrowRight") { e.preventDefault(); setActiveTab(ids[(cur + 1) % ids.length]); }
-              if (e.key === "ArrowLeft")  { e.preventDefault(); setActiveTab(ids[(cur - 1 + ids.length) % ids.length]); }
-              if (e.key === "Home")       { e.preventDefault(); setActiveTab(ids[0]); }
-              if (e.key === "End")        { e.preventDefault(); setActiveTab(ids[ids.length - 1]); }
-            }}
-          >
-            {CPF_TABS.map(([id, label]) => (
-              <button
-                key={id}
-                role="tab"
-                aria-selected={activeTab === id}
-                aria-controls={`tabpanel-${id}`}
-                id={`tab-${id}`}
-                tabIndex={activeTab === id ? 0 : -1}
-                className={`tab-btn ${activeTab === id ? "active" : ""}`}
-                onClick={() => setActiveTab(id)}
-              >{label}</button>
-            ))}
+            {/* Tab bar — two scrollable rows */}
+            <div role="tablist" aria-label="Calculator sections"
+              onKeyDown={(e) => {
+                const ids = TABS.map(([id]) => id);
+                const cur = ids.indexOf(activeTab);
+                if (e.key === "ArrowRight") { e.preventDefault(); setActiveTab(ids[(cur + 1) % ids.length]); }
+                if (e.key === "ArrowLeft")  { e.preventDefault(); setActiveTab(ids[(cur - 1 + ids.length) % ids.length]); }
+                if (e.key === "Home")       { e.preventDefault(); setActiveTab(ids[0]); }
+                if (e.key === "End")        { e.preventDefault(); setActiveTab(ids[ids.length - 1]); }
+              }}
+            >
+              {/* Row 1: CPF tabs */}
+              <div className="tab-row" style={{ display: "flex", gap: 4, overflowX: "auto", paddingBottom: 2 }}>
+                {CPF_TABS.map(([id, label]) => (
+                  <button key={id} role="tab" aria-selected={activeTab === id}
+                    aria-controls={`tabpanel-${id}`} id={`tab-${id}`}
+                    tabIndex={activeTab === id ? 0 : -1}
+                    className={`tab-btn ${activeTab === id ? "active" : ""}`}
+                    onClick={() => setActiveTab(id)}>{label}</button>
+                ))}
+              </div>
 
-            {/* Full-width break + section label before asset tabs */}
-            <div aria-hidden="true" style={{ flexBasis: "100%", height: 4 }} />
-            <div aria-hidden="true" style={{
-              flexBasis: "100%", display: "flex", alignItems: "center", gap: 8, marginBottom: 2,
-            }}>
-              <div style={{ height: 1, flex: 1, background: "var(--border)" }} />
-              <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.1em", color: "var(--muted)", whiteSpace: "nowrap" }}>
-                Assets &amp; Planning
-              </span>
-              <div style={{ height: 1, flex: 1, background: "var(--border)" }} />
+              {/* Divider */}
+              <div aria-hidden="true" style={{ display: "flex", alignItems: "center", gap: 8, margin: "6px 2px" }}>
+                <div style={{ height: 1, flex: 1, background: "var(--border)" }} />
+                <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted)", whiteSpace: "nowrap" }}>
+                  Assets &amp; Planning
+                </span>
+                <div style={{ height: 1, flex: 1, background: "var(--border)" }} />
+              </div>
+
+              {/* Row 2: Asset tabs */}
+              <div className="tab-row" style={{ display: "flex", gap: 4, overflowX: "auto", paddingBottom: 2, marginBottom: 6 }}>
+                {ASSET_TABS.map(([id, label]) => (
+                  <button key={id} role="tab" aria-selected={activeTab === id}
+                    aria-controls={`tabpanel-${id}`} id={`tab-${id}`}
+                    tabIndex={activeTab === id ? 0 : -1}
+                    className={`tab-btn ${activeTab === id ? "active" : ""}`}
+                    onClick={() => setActiveTab(id)}>{label}</button>
+                ))}
+              </div>
             </div>
-
-            {ASSET_TABS.map(([id, label]) => (
-              <button
-                key={id}
-                role="tab"
-                aria-selected={activeTab === id}
-                aria-controls={`tabpanel-${id}`}
-                id={`tab-${id}`}
-                tabIndex={activeTab === id ? 0 : -1}
-                className={`tab-btn ${activeTab === id ? "active" : ""}`}
-                onClick={() => setActiveTab(id)}
-              >{label}</button>
-            ))}
-            </div>{/* end tab bar */}
           </div>{/* end sticky nav wrapper */}
 
           {/* ── Tab content ───────────────────────────────────────────────── */}
