@@ -19,14 +19,20 @@ export function toCsv(rows) {
 
 export function printTable(title, sections) {
   const win = window.open("", "_blank");
+  const esc = s => String(s ?? "")
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#39;");
   const body = sections.map(({ heading, headers, rows }) => `
-    ${heading ? `<h2>${heading}</h2>` : ""}
+    ${heading ? `<h2>${esc(heading)}</h2>` : ""}
     <table>
-      <thead><tr>${headers.map(h => `<th>${h}</th>`).join("")}</tr></thead>
-      <tbody>${rows.map(row => `<tr>${row.map(c => `<td>${c ?? ""}</td>`).join("")}</tr>`).join("")}</tbody>
+      <thead><tr>${headers.map(h => `<th>${esc(h)}</th>`).join("")}</tr></thead>
+      <tbody>${rows.map(row => `<tr>${row.map(c => `<td>${esc(c)}</td>`).join("")}</tr>`).join("")}</tbody>
     </table>
   `).join("\n");
-  win.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>
+  win.document.write(`<!DOCTYPE html><html><head><title>${esc(title)}</title><style>
     body{font-family:system-ui,sans-serif;padding:24px;color:#111;font-size:13px}
     h1{font-size:20px;margin-bottom:4px}h2{font-size:15px;margin:20px 0 8px;color:#374151;border-bottom:1px solid #e5e7eb;padding-bottom:4px}
     .meta{font-size:12px;color:#6b7280;margin-bottom:16px}
@@ -36,7 +42,7 @@ export function printTable(title, sections) {
     .print-btn{padding:8px 16px;background:#111;color:#fff;border:none;border-radius:6px;cursor:pointer;margin-bottom:16px;font-size:13px}
     @media print{.print-btn{display:none}}
   </style></head><body>
-    <h1>${title}</h1>
+    <h1>${esc(title)}</h1>
     <div class="meta">Generated ${new Date().toLocaleString()}</div>
     <button class="print-btn" onclick="window.print()">Print / Save as PDF</button>
     ${body}
