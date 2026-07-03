@@ -1,5 +1,6 @@
 import { useState, useEffect, useMemo } from "react";
 import { RM, USD, uid } from "../../lib/finance.js";
+import { totalDownpayment } from "../../lib/housing.js";
 
 function lsJson(key) {
   try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : []; } catch { return []; }
@@ -33,7 +34,7 @@ export default function SummaryTab({ cpfData, yearsToProject, projectionData }) 
   const cpfFinalAge = cpfData?.age   || 0;
 
   const propStats = useMemo(() => properties.map(p => {
-    const downpaid = (p.downpaymentRecords || []).reduce((s, r) => s + (r.amount || 0), 0);
+    const downpaid = totalDownpayment(p);
     return { ...p, downpaid, outstanding: Math.max(0, p.purchasePrice - downpaid) };
   }), [properties]);
   const totalPropValue  = propStats.reduce((s, p) => s + p.purchasePrice, 0);

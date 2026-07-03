@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { projectEpfYears } from "../../lib/epf.js";
 import { fetchFxRates } from "../../lib/fetchFx.js";
+import { totalDownpayment } from "../../lib/housing.js";
 
 export default function NetWorthTab({ projectionData, yearsToProject }) {
   const [usdToSgd, setUsdToSgd] = useState(() => parseFloat(localStorage.getItem("fx_usd_sgd") || "1.35"));
@@ -102,10 +103,7 @@ export default function NetWorthTab({ projectionData, yearsToProject }) {
   const myStocksLive = myStocks.some(h => myStockPrices[h.code]);
 
   const fdPrincipal   = fdList.reduce((s, fd) => s + (parseFloat(fd.principal) || 0), 0);
-  const housingEquity = properties.reduce((s, p) => {
-    const paid = (p.downpaymentRecords || []).reduce((a, r) => a + (r.amount || 0), 0);
-    return s + paid;
-  }, 0);
+  const housingEquity = properties.reduce((s, p) => s + totalDownpayment(p), 0);
   const epfStart = epfSettings.startPer + epfSettings.startSej + epfSettings.startFlek;
 
   const chartData = useMemo(() => {

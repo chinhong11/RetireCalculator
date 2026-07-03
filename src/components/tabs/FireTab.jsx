@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { projectEpfYears } from "../../lib/epf.js";
+import { totalDownpayment } from "../../lib/housing.js";
 
 export default function FireTab({ projectionData, yearsToProject }) {
   const [monthlyExpenses, setMonthlyExpenses] = useState(() => parseFloat(localStorage.getItem("fire_monthly_exp") || "3000"));
@@ -66,7 +67,7 @@ export default function FireTab({ projectionData, yearsToProject }) {
     || myStocks.some(h => myStockPrices[h.code]);
 
   const fdPrincipal   = fdList.reduce((s, fd) => s + (parseFloat(fd.principal) || 0), 0);
-  const housingEquity = properties.reduce((s, p) => s + (p.downpaymentRecords || []).reduce((a, r) => a + (r.amount || 0), 0), 0);
+  const housingEquity = properties.reduce((s, p) => s + totalDownpayment(p), 0);
   const epfStart      = epfSettings.startPer + epfSettings.startSej + epfSettings.startFlek;
 
   const monthlySavings = useMemo(() => {

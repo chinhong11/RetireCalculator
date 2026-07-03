@@ -1,5 +1,6 @@
 import { useState, useMemo, useEffect } from "react";
-import { RM, RM2, calcInstallment, uid, newProperty } from "../../lib/finance.js";
+import { RM, RM2, uid, newProperty } from "../../lib/finance.js";
+import { loanSummary, progressiveTimeline as buildProgressiveTimeline, amortizationSchedule } from "../../lib/housing.js";
 import { toCsv, downloadBlob, printTable } from "../../lib/backup.js";
 import { StatCard } from "../shared/StatCard.jsx";
 import { LabelField } from "../shared/LabelField.jsx";
@@ -84,89 +85,13 @@ export default function HousingLoanTab() {
 
   const delPR = (recId) => prop && upd({ progressiveRecords: (prop.progressiveRecords || []).filter(r => r.id !== recId) });
 
-  const totalDownpaid = useMemo(() =>
-    (prop?.downpaymentRecords || []).reduce((s, r) => s + (r.amount || 0), 0), [prop]);
+  const { downpaid: totalDownpaid, loanAmount, monthlyInstallment, totalPayable, totalInterest } =
+    useMemo(() => loanSummary(prop), [prop]);
 
-  const loanAmount = useMemo(
-    () => Math.max(0, (prop?.purchasePrice || 0) - totalDownpaid),
-    [prop?.purchasePrice, totalDownpaid],
-  );
-  const monthlyInstallment = useMemo(
-    () => calcInstallment(loanAmount, prop?.interestRate || 0, prop?.tenure || 0),
-    [loanAmount, prop?.interestRate, prop?.tenure],
-  );
-  const totalPayable = useMemo(
-    () => monthlyInstallment * (prop?.tenure || 0) * 12,
-    [monthlyInstallment, prop?.tenure],
-  );
-  const totalInterest = useMemo(
-    () => Math.max(0, totalPayable - loanAmount),
-    [totalPayable, loanAmount],
-  );
-
-  const progressiveTimeline = useMemo(() => {
-    if (!prop) return [];
-    const r = (prop.interestRate || 0) / 100 / 12;
-    let cum = 0;
-    const records = prop.progressiveRecords || [];
-    const vpDate = prop.vpDate ? new Date(prop.vpDate + "-01") : null;
-
-    return records.map((rec, idx) => {
-      cum += rec.claimAmount || 0;
-      const monthlyInterest = cum * r;
-
-      // Months this stage's cumulative amount accrues interest:
-      // from this claim month until the next claim (or VP date).
-      let stageDuration = null;
-      if (rec.month) {
-        const claimDate = new Date(rec.month + "-01");
-        const nextRec = records[idx + 1];
-        const endDate = nextRec?.month ? new Date(nextRec.month + "-01") : vpDate;
-        if (endDate && endDate > claimDate) {
-          stageDuration = (endDate.getFullYear() - claimDate.getFullYear()) * 12
-                        + (endDate.getMonth() - claimDate.getMonth());
-        }
-      }
-
-      const stageInterestTotal = stageDuration !== null
-        ? monthlyInterest * stageDuration
-        : monthlyInterest;
-
-      return { ...rec, cumulative: cum, monthlyInterest, stageDuration, stageInterestTotal };
-    });
-  }, [prop]);
-
+  const progressiveTimeline = useMemo(() => buildProgressiveTimeline(prop), [prop]);
   const totalProgInterest = progressiveTimeline.reduce((s, r) => s + r.stageInterestTotal, 0);
 
-  const amortSchedule = useMemo(() => {
-    if (!loanAmount || !prop?.interestRate || !prop?.tenure || !monthlyInstallment) return [];
-    const r = prop.interestRate / 100 / 12;
-    const n = prop.tenure * 12;
-    let balance = loanAmount;
-
-    // Derive the first repayment month from property dates
-    const refStr = prop.type === "under_construction" ? prop.vpDate : prop.spaDate;
-    let startDate = refStr ? new Date(refStr + "-01") : null;
-    if (startDate && prop.type !== "under_construction") {
-      // Completed/subsale: loan starts ~1 month after SPA
-      startDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 1);
-    }
-
-    return Array.from({ length: n }, (_, idx) => {
-      const i = idx + 1;
-      const interest = balance * r;
-      const principal = Math.min(monthlyInstallment - interest, balance);
-      const closing = Math.max(0, balance - principal);
-      let dateStr = "";
-      if (startDate) {
-        const d = new Date(startDate.getFullYear(), startDate.getMonth() + idx, 1);
-        dateStr = d.toLocaleDateString("en-MY", { month: "short", year: "numeric" });
-      }
-      const row = { month: i, year: Math.ceil(i / 12), date: dateStr, opening: balance, principal, interest, closing };
-      balance = closing;
-      return row;
-    });
-  }, [loanAmount, prop?.interestRate, prop?.tenure, monthlyInstallment, prop?.vpDate, prop?.spaDate, prop?.type]);
+  const amortSchedule = useMemo(() => amortizationSchedule(prop), [prop]);
 
   const amortTotalInterest = amortSchedule.reduce((s, r) => s + r.interest, 0);
   const amortTotalPrincipal = amortSchedule.reduce((s, r) => s + r.principal, 0);
@@ -179,9 +104,7 @@ export default function HousingLoanTab() {
 
   const exportHousingCsv = () => {
     const summaryRows = properties.map(p => {
-      const dp = (p.downpaymentRecords || []).reduce((s, r) => s + (r.amount || 0), 0);
-      const loan = Math.max(0, p.purchasePrice - dp);
-      const inst = calcInstallment(loan, p.interestRate || 0, p.tenure || 0);
+      const { downpaid: dp, loanAmount: loan, monthlyInstallment: inst } = loanSummary(p);
       return {
         Property: p.name, Developer: p.developer, Address: p.address,
         Type: p.type, "Purchase Price (MYR)": p.purchasePrice,
@@ -215,9 +138,7 @@ export default function HousingLoanTab() {
         heading: "Property Summary",
         headers: ["Property", "Purchase Price (MYR)", "Downpaid (MYR)", "Loan (MYR)", "Rate", "Tenure", "Monthly Installment"],
         rows: properties.map(p => {
-          const dp = (p.downpaymentRecords || []).reduce((s, r) => s + (r.amount || 0), 0);
-          const loan = Math.max(0, p.purchasePrice - dp);
-          const inst = calcInstallment(loan, p.interestRate || 0, p.tenure || 0);
+          const { downpaid: dp, loanAmount: loan, monthlyInstallment: inst } = loanSummary(p);
           return [p.name, RM(p.purchasePrice), RM(dp), RM(loan), `${p.interestRate}%`, `${p.tenure} yrs`, RM2(inst)];
         }),
       },
