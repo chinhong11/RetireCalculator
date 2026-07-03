@@ -3,6 +3,7 @@ import { USD, uid, COIN_IDS, fmtCoin } from "../../lib/finance.js";
 import { toCsv, downloadBlob, printTable } from "../../lib/backup.js";
 import { StatCard } from "../shared/StatCard.jsx";
 import { usePersistedState } from "../../lib/usePersistedState.js";
+import { fetchWithTimeout } from "../../lib/fetchWithTimeout.js";
 
 export default function CryptoTab() {
   const [holdings, setHoldings] = usePersistedState("crypto_v1", [], "jsonArray");
@@ -30,9 +31,10 @@ export default function CryptoTab() {
     setFetching(s => new Set([...s, ticker]));
     setFetchErrors(e => { const n = { ...e }; delete n[ticker]; return n; });
     try {
-      const res = await fetch(
+      const res = await fetchWithTimeout(
         `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(coinId)}&vs_currencies=usd&include_24hr_change=true`
       );
+      if (res.status === 429) throw new Error("CoinGecko rate limit — wait a minute and retry");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (!data[coinId]?.usd) throw new Error(`"${ticker}" not found — try the CoinGecko coin ID`);
