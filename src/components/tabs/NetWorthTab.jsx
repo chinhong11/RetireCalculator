@@ -2,14 +2,13 @@ import { useState, useEffect, useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { projectEpfYears } from "../../lib/epf.js";
 import { fetchFxRates } from "../../lib/fetchFx.js";
+import { totalDownpayment } from "../../lib/housing.js";
+import { usePersistedState } from "../../lib/usePersistedState.js";
 
 export default function NetWorthTab({ projectionData, yearsToProject }) {
-  const [usdToSgd, setUsdToSgd] = useState(() => parseFloat(localStorage.getItem("fx_usd_sgd") || "1.35"));
-  const [myrToSgd, setMyrToSgd] = useState(() => parseFloat(localStorage.getItem("fx_myr_sgd") || "0.30"));
+  const [usdToSgd, setUsdToSgd] = usePersistedState("fx_usd_sgd", 1.35);
+  const [myrToSgd, setMyrToSgd] = usePersistedState("fx_myr_sgd", 0.30);
   const [fxStatus, setFxStatus] = useState("idle"); // "idle" | "loading" | "live" | "error"
-
-  useEffect(() => { localStorage.setItem("fx_usd_sgd", usdToSgd); }, [usdToSgd]);
-  useEffect(() => { localStorage.setItem("fx_myr_sgd", myrToSgd); }, [myrToSgd]);
 
   useEffect(() => {
     setFxStatus("loading");
@@ -102,10 +101,7 @@ export default function NetWorthTab({ projectionData, yearsToProject }) {
   const myStocksLive = myStocks.some(h => myStockPrices[h.code]);
 
   const fdPrincipal   = fdList.reduce((s, fd) => s + (parseFloat(fd.principal) || 0), 0);
-  const housingEquity = properties.reduce((s, p) => {
-    const paid = (p.downpaymentRecords || []).reduce((a, r) => a + (r.amount || 0), 0);
-    return s + paid;
-  }, 0);
+  const housingEquity = properties.reduce((s, p) => s + totalDownpayment(p), 0);
   const epfStart = epfSettings.startPer + epfSettings.startSej + epfSettings.startFlek;
 
   const chartData = useMemo(() => {
@@ -132,7 +128,7 @@ export default function NetWorthTab({ projectionData, yearsToProject }) {
 
   const fmtSGD  = v => "S$" + Math.round(v).toLocaleString();
   const inputStyle = { background: "var(--card-bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "6px 10px", color: "var(--text)", fontSize: 13, width: "100%", maxWidth: 140 };
-  const cardStyle  = { borderRadius: 12, padding: "14px 18px", background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)" };
+  const cardStyle  = { borderRadius: 12, padding: "14px 18px", background: "var(--hover-bg)", border: "1px solid var(--border)" };
 
   const SERIES = [
     { key: "cpf",      label: "CPF (SGD)",             color: "#6ee7b7", note: "projected" },
@@ -280,8 +276,9 @@ export default function NetWorthTab({ projectionData, yearsToProject }) {
         </div>
       </div>
 
-      <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7 }}>
-        <strong style={{ color: "var(--label)" }}>Note:</strong> Stocks and crypto use <strong style={{ color: "var(--label)" }}>live market prices</strong> when available (fetched in the portfolio tabs) — labelled <span style={{ color: "#6ee7b7" }}>● live</span> in the legend. When no prices have been fetched yet, cost basis is used instead. CPF and EPF are projected year-by-year. Housing equity reflects downpayments recorded. FX rates are user-defined. All snapshot values are flat (no future appreciation assumed). For personal planning only — not financial advice.
+      <div style={{ padding: "12px 16px", borderRadius: 10, background: "var(--card-bg)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7, display: "flex", gap: 8, alignItems: "flex-start" }}>
+        <span style={{ flexShrink: 0, opacity: 0.5 }}>📌</span>
+        <span><strong style={{ color: "var(--label)" }}>Note:</strong> Stocks and crypto use <strong style={{ color: "var(--label)" }}>live market prices</strong> when available (fetched in the portfolio tabs) — labelled <span style={{ color: "#6ee7b7" }}>● live</span> in the legend. When no prices have been fetched yet, cost basis is used instead. CPF and EPF are projected year-by-year. Housing equity reflects downpayments recorded. FX rates are user-defined. All snapshot values are flat (no future appreciation assumed). For personal planning only — not financial advice.</span>
       </div>
     </div>
   );

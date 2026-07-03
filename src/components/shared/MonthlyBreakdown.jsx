@@ -27,10 +27,21 @@ export function MonthlyBreakdown({ monthly, prYear, age }) {
         color={age >= 55 ? "#a78bfa" : "#818cf8"}
       />
       <AccountBar label="MediSave Account (MA)"  amount={monthly.maAmount} total={monthly.totalContrib} color="#f472b6" />
-      <div style={{ marginTop: 16, padding: "12px 16px", borderRadius: 10, background: "var(--accent-subtle)", border: "1px solid var(--accent-border-c)", fontSize: 12, color: "var(--label)", lineHeight: 1.6 }}>
-        {prYear === 1 && "💡 As a 1st-year PR, your combined CPF rate is 9% — much lower than the full 37%. Rates increase in Year 2 (24%) and reach full citizen rates from Year 3 onwards."}
-        {prYear === 2 && "💡 As a 2nd-year PR, your combined CPF rate is 24%. From next year, you'll contribute at the full citizen rate of 37%."}
-        {prYear >= 3 && "💡 You're contributing at the full citizen rate of 37% (employee 20% + employer 17%)."}
+      <div style={{
+        marginTop: 16, padding: "12px 16px", borderRadius: 10,
+        background: "var(--accent-subtle)", border: "1px solid var(--accent-border-c)",
+        fontSize: 12, color: "var(--label)", lineHeight: 1.65,
+        display: "flex", gap: 10, alignItems: "flex-start",
+      }}>
+        <span style={{
+          fontSize: 14, flexShrink: 0, lineHeight: 1.65,
+          color: "var(--accent)", fontWeight: 700,
+        }}>💡</span>
+        <span>
+          {prYear === 1 && <>As a <strong style={{ color: "var(--accent)" }}>1st-year PR</strong>, your combined CPF rate is <strong style={{ color: "var(--accent)" }}>9%</strong> — much lower than the full 37%. Rates rise to 24% in Year 2 and reach full citizen rates from Year 3 onwards.</>}
+          {prYear === 2 && <>As a <strong style={{ color: "var(--accent)" }}>2nd-year PR</strong>, your combined CPF rate is <strong style={{ color: "var(--accent)" }}>24%</strong>. From next year, you'll contribute at the full citizen rate of 37%.</>}
+          {prYear >= 3 && <>You're contributing at the <strong style={{ color: "var(--accent)" }}>full citizen rate of 37%</strong> (employee 20% + employer 17%).</>}
+        </span>
       </div>
     </div>
   );

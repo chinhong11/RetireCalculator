@@ -37,6 +37,8 @@ export function projectEpfYears({ wage, age, annualIncrement, years, dividendRat
     w = Math.round(w * (1 + annualIncrement / 100));
     const m = computeEpfMonthly(w, a);
     const yPer = m.persaraan * 12, ySej = m.sejahtera * 12, yFlek = m.fleksibel * 12;
+    // Dividend approximation: opening balance earns the full year's dividend;
+    // new contributions earn half a year on average (mid-year simplification).
     const divPer = r * (per + yPer * 0.5);
     const divSej = r * (sej + ySej * 0.5);
     const divFlek = r * (flek + yFlek * 0.5);

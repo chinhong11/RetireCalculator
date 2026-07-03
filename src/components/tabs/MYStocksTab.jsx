@@ -3,15 +3,10 @@ import { RM, RM2, uid } from "../../lib/finance.js";
 import { toCsv, downloadBlob, printTable } from "../../lib/backup.js";
 import { StatCard } from "../shared/StatCard.jsx";
 import { fetchYahooChart } from "../../lib/fetchPrice.js";
+import { usePersistedState } from "../../lib/usePersistedState.js";
 
 export default function MYStocksTab() {
-  const [holdings, setHoldings] = useState(() => {
-    try {
-      const s = localStorage.getItem("mystocks_v1");
-      if (s) { const h = JSON.parse(s); if (Array.isArray(h)) return h; }
-    } catch {}
-    return [];
-  });
+  const [holdings, setHoldings] = usePersistedState("mystocks_v1", [], "jsonArray");
 
   const [prices, setPrices] = useState({});
   const [fetching, setFetching] = useState(new Set());
@@ -20,10 +15,6 @@ export default function MYStocksTab() {
   const [refreshedAt, setRefreshedAt] = useState(null);
   const [editingPrice, setEditingPrice] = useState(new Set());
   const [manualInput, setManualInput] = useState({});
-
-  useEffect(() => {
-    try { localStorage.setItem("mystocks_v1", JSON.stringify(holdings)); } catch {}
-  }, [holdings]);
 
   useEffect(() => {
     if (Object.keys(prices).length === 0) return;
@@ -319,8 +310,9 @@ export default function MYStocksTab() {
         </div>
       )}
 
-      <div style={{ padding: "14px 18px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7 }}>
-        <strong style={{ color: "var(--label)" }}>Note (Bursa Malaysia):</strong> Prices are fetched from Yahoo Finance using the .KL suffix and may be delayed 15–20 minutes during Bursa trading hours (9:00am–5:00pm MYT, Mon–Fri). P&L is unrealised gain/loss based on cost basis (shares × buy price + fees). Include brokerage fees and stamp duty in the Fees field for accurate cost basis. All values in MYR. For personal record-keeping only — not financial advice.
+      <div style={{ padding: "14px 18px", borderRadius: 12, background: "var(--card-bg)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7, display: "flex", gap: 8, alignItems: "flex-start" }}>
+        <span style={{ flexShrink: 0, opacity: 0.5 }}>📌</span>
+        <span><strong style={{ color: "var(--label)" }}>Note (Bursa Malaysia):</strong> Prices are fetched from Yahoo Finance using the .KL suffix and may be delayed 15–20 minutes during Bursa trading hours (9:00am–5:00pm MYT, Mon–Fri). P&amp;L is unrealised gain/loss based on cost basis (shares × buy price + fees). Include brokerage fees and stamp duty in the Fees field for accurate cost basis. All values in MYR. For personal record-keeping only — not financial advice.</span>
       </div>
     </div>
   );

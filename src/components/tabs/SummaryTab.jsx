@@ -1,18 +1,29 @@
 import { useState, useEffect, useMemo } from "react";
 import { RM, USD, uid } from "../../lib/finance.js";
+import { totalDownpayment } from "../../lib/housing.js";
+import { usePersistedState } from "../../lib/usePersistedState.js";
+
+function lsJson(key) {
+  try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : []; } catch { return []; }
+}
 
 export default function SummaryTab({ cpfData, yearsToProject, projectionData }) {
-  const properties = useMemo(() => {
-    try { const s = localStorage.getItem("hl_props_v1"); return s ? JSON.parse(s) : []; } catch { return []; }
-  }, []);
-  const stockHoldings = useMemo(() => {
-    try { const s = localStorage.getItem("stocks_v1"); return s ? JSON.parse(s) : []; } catch { return []; }
-  }, []);
-  const cryptoHoldings = useMemo(() => {
-    try { const s = localStorage.getItem("crypto_v1"); return s ? JSON.parse(s) : []; } catch { return []; }
-  }, []);
-  const myStockHoldings = useMemo(() => {
-    try { const s = localStorage.getItem("mystocks_v1"); return s ? JSON.parse(s) : []; } catch { return []; }
+  // Read once on mount; re-read whenever the tab becomes visible so data
+  // reflects edits made in other tabs during the same session.
+  const [properties,     setProperties]     = useState(() => lsJson("hl_props_v1"));
+  const [stockHoldings,  setStockHoldings]  = useState(() => lsJson("stocks_v1"));
+  const [cryptoHoldings, setCryptoHoldings] = useState(() => lsJson("crypto_v1"));
+  const [myStockHoldings, setMyStockHoldings] = useState(() => lsJson("mystocks_v1"));
+
+  useEffect(() => {
+    const refresh = () => {
+      setProperties(lsJson("hl_props_v1"));
+      setStockHoldings(lsJson("stocks_v1"));
+      setCryptoHoldings(lsJson("crypto_v1"));
+      setMyStockHoldings(lsJson("mystocks_v1"));
+    };
+    window.addEventListener("focus", refresh);
+    return () => window.removeEventListener("focus", refresh);
   }, []);
 
   const SGD = (n) => "S$" + Number(n || 0).toLocaleString("en-SG", { maximumFractionDigits: 0 });
@@ -24,7 +35,7 @@ export default function SummaryTab({ cpfData, yearsToProject, projectionData }) 
   const cpfFinalAge = cpfData?.age   || 0;
 
   const propStats = useMemo(() => properties.map(p => {
-    const downpaid = (p.downpaymentRecords || []).reduce((s, r) => s + (r.amount || 0), 0);
+    const downpaid = totalDownpayment(p);
     return { ...p, downpaid, outstanding: Math.max(0, p.purchasePrice - downpaid) };
   }), [properties]);
   const totalPropValue  = propStats.reduce((s, p) => s + p.purchasePrice, 0);
@@ -36,14 +47,8 @@ export default function SummaryTab({ cpfData, yearsToProject, projectionData }) 
   const cryptoCost   = cryptoHoldings.reduce((s, h)  => s + h.amount * h.buyPrice + (h.totalFees || 0), 0);
   const totalUSD     = stocksCost + cryptoCost;
 
-  const [goals, setGoals] = useState(() => {
-    try { const s = localStorage.getItem("goals_v1"); return s ? JSON.parse(s) : []; } catch { return []; }
-  });
+  const [goals, setGoals] = usePersistedState("goals_v1", [], "jsonArray");
   const [goalForm, setGoalForm] = useState({ name: "", currency: "SGD", target: "", targetAge: "", notes: "" });
-
-  useEffect(() => {
-    try { localStorage.setItem("goals_v1", JSON.stringify(goals)); } catch {}
-  }, [goals]);
 
   const addGoal = () => {
     if (!goalForm.name.trim() || !goalForm.target) return;
@@ -90,8 +95,14 @@ export default function SummaryTab({ cpfData, yearsToProject, projectionData }) 
 
   return (
     <div>
-      <div style={{ padding: "12px 16px", borderRadius: 10, background: "rgba(129,140,248,0.06)", border: "1px solid rgba(129,140,248,0.12)", fontSize: 12, color: "var(--label)", marginBottom: 20, lineHeight: 1.7 }}>
-        ℹ️ Your assets span multiple currencies — <strong>SGD</strong> (CPF), <strong>MYR</strong> (Property &amp; MY Stocks), <strong>USD</strong> (US Stocks &amp; Crypto). Values are shown in their native currency without conversion. Stock and crypto figures reflect cost basis; visit those tabs and refresh prices to see live P&amp;L.
+      <div style={{
+        display: "flex", gap: 10, alignItems: "flex-start",
+        padding: "12px 16px", borderRadius: 10,
+        background: "var(--accent-chip)", border: "1px solid var(--accent-border-c)",
+        fontSize: 12, color: "var(--label)", marginBottom: 20, lineHeight: 1.7,
+      }}>
+        <span style={{ fontSize: 14, flexShrink: 0, color: "var(--accent)", fontWeight: 700, lineHeight: 1.7 }}>ℹ️</span>
+        <span>Your assets span multiple currencies — <strong style={{ color: "var(--accent)" }}>SGD</strong> (CPF), <strong style={{ color: "var(--text)" }}>MYR</strong> (Property &amp; MY Stocks), <strong style={{ color: "var(--accent2)" }}>USD</strong> (US Stocks &amp; Crypto). Values are shown in their native currency without conversion. Stock and crypto figures reflect cost basis; visit those tabs to see live P&amp;L.</span>
       </div>
 
       {/* CPF (SGD) */}
@@ -235,19 +246,21 @@ export default function SummaryTab({ cpfData, yearsToProject, projectionData }) 
       <div style={{ background: "var(--card-bg)", borderRadius: 16, padding: 24, border: "1px solid var(--border)", marginBottom: 16 }}>
         <SectionHeader title="🎯 Retirement Goals" sub="Track how close you are to each financial milestone" />
 
-        <div style={{ background: "rgba(255,255,255,0.03)", borderRadius: 12, padding: 18, border: "1px solid var(--border)", marginBottom: 20 }}>
-          <div style={{ fontSize: 13, fontWeight: 600, color: "var(--label)", marginBottom: 14 }}>Add a Goal</div>
+        <div style={{ background: "var(--card-bg)", borderRadius: 12, padding: 18, border: "1px solid var(--border)", marginBottom: 20 }}>
+          <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted)", fontWeight: 700, marginBottom: 14 }}>Add a Goal</div>
           <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: 10 }}>
             <input
               placeholder="Goal name (e.g. Retirement Fund)"
               value={goalForm.name}
               onChange={e => setGoalForm(f => ({ ...f, name: e.target.value }))}
-              style={{ flex: "2 1 200px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 12px", color: "var(--text)", fontSize: 13 }}
+              className="hl-in"
+              style={{ flex: "2 1 200px" }}
             />
             <select
               value={goalForm.currency}
               onChange={e => setGoalForm(f => ({ ...f, currency: e.target.value }))}
-              style={{ flex: "0 0 90px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 10px", color: "var(--text)", fontSize: 13 }}
+              className="hl-in"
+              style={{ flex: "0 0 90px" }}
             >
               <option value="SGD">SGD</option>
               <option value="MYR">MYR</option>
@@ -258,14 +271,16 @@ export default function SummaryTab({ cpfData, yearsToProject, projectionData }) 
               placeholder="Target amount"
               value={goalForm.target}
               onChange={e => setGoalForm(f => ({ ...f, target: e.target.value }))}
-              style={{ flex: "1 1 150px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 12px", color: "var(--text)", fontSize: 13 }}
+              className="hl-in"
+              style={{ flex: "1 1 150px", fontFamily: "'DM Mono', monospace" }}
             />
             <input
               type="number"
               placeholder="Target age (opt)"
               value={goalForm.targetAge}
               onChange={e => setGoalForm(f => ({ ...f, targetAge: e.target.value }))}
-              style={{ flex: "1 1 130px", background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 12px", color: "var(--text)", fontSize: 13 }}
+              className="hl-in"
+              style={{ flex: "1 1 130px", fontFamily: "'DM Mono', monospace" }}
             />
           </div>
           <div style={{ display: "flex", gap: 10 }}>
@@ -273,11 +288,12 @@ export default function SummaryTab({ cpfData, yearsToProject, projectionData }) 
               placeholder="Notes (optional)"
               value={goalForm.notes}
               onChange={e => setGoalForm(f => ({ ...f, notes: e.target.value }))}
-              style={{ flex: 1, background: "var(--bg)", border: "1px solid var(--border)", borderRadius: 8, padding: "9px 12px", color: "var(--text)", fontSize: 13 }}
+              className="hl-in"
+              style={{ flex: 1 }}
             />
             <button
               onClick={addGoal}
-              style={{ padding: "9px 22px", background: "var(--accent)", color: "#0a0e17", borderRadius: 8, border: "none", fontWeight: 700, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap" }}
+              style={{ padding: "9px 22px", background: "var(--accent)", color: "#0a0e17", borderRadius: 8, border: "none", fontWeight: 700, fontSize: 13, cursor: "pointer", whiteSpace: "nowrap", fontFamily: "inherit" }}
             >
               + Add
             </button>
@@ -355,8 +371,17 @@ export default function SummaryTab({ cpfData, yearsToProject, projectionData }) 
         )}
       </div>
 
-      <div style={{ padding: "14px 18px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7 }}>
-        <strong style={{ color: "var(--label)" }}>Note:</strong> CPF figures are projected values based on your inputs — not actual current balances. Property equity reflects total downpayments recorded, not appraised market value. Stock and crypto values show cost basis only. No currency conversion is applied between SGD, MYR, and USD. Visit each tab and refresh prices to see live portfolio values and unrealised P&amp;L.
+      <div style={{
+        padding: "14px 18px", borderRadius: 12,
+        background: "var(--card-bg)", border: "1px solid var(--border)",
+        fontSize: 11, color: "var(--muted)", lineHeight: 1.8,
+        display: "flex", gap: 10, alignItems: "flex-start",
+      }}>
+        <span style={{ fontSize: 13, flexShrink: 0, opacity: 0.5 }}>📌</span>
+        <span>
+          <strong style={{ color: "var(--label)", fontWeight: 700 }}>Note:</strong>{" "}
+          CPF figures are projected values based on your inputs — not actual current balances. Property equity reflects total downpayments recorded, not appraised market value. Stock and crypto values show cost basis only. No currency conversion is applied between SGD, MYR, and USD. Visit each tab to see live portfolio values and unrealised P&amp;L.
+        </span>
       </div>
     </div>
   );

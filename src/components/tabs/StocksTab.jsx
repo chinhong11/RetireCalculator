@@ -3,15 +3,10 @@ import { USD, uid } from "../../lib/finance.js";
 import { toCsv, downloadBlob, printTable } from "../../lib/backup.js";
 import { StatCard } from "../shared/StatCard.jsx";
 import { fetchYahooChart } from "../../lib/fetchPrice.js";
+import { usePersistedState } from "../../lib/usePersistedState.js";
 
 export default function StocksTab() {
-  const [holdings, setHoldings] = useState(() => {
-    try {
-      const s = localStorage.getItem("stocks_v1");
-      if (s) { const h = JSON.parse(s); if (Array.isArray(h)) return h; }
-    } catch {}
-    return [];
-  });
+  const [holdings, setHoldings] = usePersistedState("stocks_v1", [], "jsonArray");
 
   const [prices, setPrices] = useState({});
   const [fetching, setFetching] = useState(new Set());
@@ -20,10 +15,6 @@ export default function StocksTab() {
   const [refreshedAt, setRefreshedAt] = useState(null);
   const [editingPrice, setEditingPrice] = useState(new Set());
   const [manualInput, setManualInput] = useState({});
-
-  useEffect(() => {
-    try { localStorage.setItem("stocks_v1", JSON.stringify(holdings)); } catch {}
-  }, [holdings]);
 
   useEffect(() => {
     if (Object.keys(prices).length === 0) return;
@@ -329,8 +320,9 @@ export default function StocksTab() {
         </div>
       )}
 
-      <div style={{ padding: "14px 18px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7 }}>
-        <strong style={{ color: "var(--label)" }}>Note:</strong> Prices are fetched live from Yahoo Finance and may be delayed up to 15–20 minutes during market hours. P&L shown is unrealised gain/loss based on your cost basis (shares × buy price + fees). All values in USD. For personal record-keeping only — not financial advice.
+      <div style={{ padding: "14px 18px", borderRadius: 12, background: "var(--card-bg)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7, display: "flex", gap: 8, alignItems: "flex-start" }}>
+        <span style={{ flexShrink: 0, opacity: 0.5 }}>📌</span>
+        <span><strong style={{ color: "var(--label)" }}>Note:</strong> Prices are fetched live from Yahoo Finance and may be delayed up to 15–20 minutes during market hours. P&amp;L shown is unrealised gain/loss based on your cost basis (shares × buy price + fees). All values in USD. For personal record-keeping only — not financial advice.</span>
       </div>
     </div>
   );

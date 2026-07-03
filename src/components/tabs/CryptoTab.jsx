@@ -2,15 +2,11 @@ import { useState, useMemo, useEffect } from "react";
 import { USD, uid, COIN_IDS, fmtCoin } from "../../lib/finance.js";
 import { toCsv, downloadBlob, printTable } from "../../lib/backup.js";
 import { StatCard } from "../shared/StatCard.jsx";
+import { usePersistedState } from "../../lib/usePersistedState.js";
+import { fetchWithTimeout } from "../../lib/fetchWithTimeout.js";
 
 export default function CryptoTab() {
-  const [holdings, setHoldings] = useState(() => {
-    try {
-      const s = localStorage.getItem("crypto_v1");
-      if (s) { const h = JSON.parse(s); if (Array.isArray(h)) return h; }
-    } catch {}
-    return [];
-  });
+  const [holdings, setHoldings] = usePersistedState("crypto_v1", [], "jsonArray");
 
   const [prices, setPrices] = useState({});
   const [fetching, setFetching] = useState(new Set());
@@ -26,10 +22,6 @@ export default function CryptoTab() {
   const [dcaAddFees, setDcaAddFees] = useState("0");
 
   useEffect(() => {
-    try { localStorage.setItem("crypto_v1", JSON.stringify(holdings)); } catch {}
-  }, [holdings]);
-
-  useEffect(() => {
     if (Object.keys(prices).length === 0) return;
     try { localStorage.setItem("crypto_prices_v1", JSON.stringify(prices)); } catch {}
   }, [prices]);
@@ -39,9 +31,10 @@ export default function CryptoTab() {
     setFetching(s => new Set([...s, ticker]));
     setFetchErrors(e => { const n = { ...e }; delete n[ticker]; return n; });
     try {
-      const res = await fetch(
+      const res = await fetchWithTimeout(
         `https://api.coingecko.com/api/v3/simple/price?ids=${encodeURIComponent(coinId)}&vs_currencies=usd&include_24hr_change=true`
       );
+      if (res.status === 429) throw new Error("CoinGecko rate limit — wait a minute and retry");
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       if (!data[coinId]?.usd) throw new Error(`"${ticker}" not found — try the CoinGecko coin ID`);
@@ -264,7 +257,7 @@ export default function CryptoTab() {
                     </select>
                   </div>
                   {dcaPosition ? (
-                    <div style={{ padding: "12px 14px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)", fontSize: 13, lineHeight: 1.9 }}>
+                    <div style={{ padding: "12px 14px", borderRadius: 10, background: "var(--hover-bg)", border: "1px solid var(--border)", fontSize: 13, lineHeight: 1.9 }}>
                       <div style={{ display: "grid", gridTemplateColumns: "auto 1fr", columnGap: 14 }}>
                         <span style={{ color: "var(--muted)", fontSize: 12 }}>Amount held</span>
                         <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 600 }}>{dcaPosition.totalAmount.toPrecision(8).replace(/\.?0+$/, "")}</span>
@@ -345,7 +338,7 @@ export default function CryptoTab() {
                         const pnlPct = ((live - dcaResult.newAvgCost) / dcaResult.newAvgCost) * 100;
                         const pnl = (live - dcaResult.newAvgCost) * dcaResult.newAmount;
                         return (
-                          <div style={{ marginTop: 10, padding: "10px 14px", borderRadius: 8, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 12 }}>
+                          <div style={{ marginTop: 10, padding: "10px 14px", borderRadius: 8, background: "var(--hover-bg)", border: "1px solid var(--border)", fontSize: 12 }}>
                             <div style={{ color: "var(--muted)", marginBottom: 3 }}>P&amp;L at live price ({fmtCoin(live)})</div>
                             <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, color: pnlPct >= 0 ? "#4ade80" : "#f87171" }}>
                               {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}% &nbsp;·&nbsp; {pnl >= 0 ? "+" : ""}{USD(pnl)}
@@ -489,8 +482,9 @@ export default function CryptoTab() {
         </div>
       )}
 
-      <div style={{ padding: "14px 18px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7 }}>
-        <strong style={{ color: "var(--label)" }}>Note:</strong> Prices are fetched from CoinGecko (free public API). P&L is unrealised gain/loss based on your cost basis (amount × buy price + fees). All values in USD. For unlisted tokens, enter the CoinGecko coin ID (e.g. "wrapped-bitcoin") in the Coin field. For personal record-keeping only — not financial advice.
+      <div style={{ padding: "14px 18px", borderRadius: 12, background: "var(--card-bg)", border: "1px solid var(--border)", fontSize: 11, color: "var(--muted)", lineHeight: 1.7, display: "flex", gap: 8, alignItems: "flex-start" }}>
+        <span style={{ flexShrink: 0, opacity: 0.5 }}>📌</span>
+        <span><strong style={{ color: "var(--label)" }}>Note:</strong> Prices are fetched from CoinGecko (free public API). P&amp;L is unrealised gain/loss based on your cost basis (amount × buy price + fees). All values in USD. For unlisted tokens, enter the CoinGecko coin ID (e.g. "wrapped-bitcoin") in the Coin field. For personal record-keeping only — not financial advice.</span>
       </div>
     </div>
   );

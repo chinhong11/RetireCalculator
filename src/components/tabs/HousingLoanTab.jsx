@@ -1,8 +1,12 @@
 import { useState, useMemo, useEffect } from "react";
-import { RM, RM2, calcInstallment, uid, newProperty } from "../../lib/finance.js";
+import { RM, RM2, uid, newProperty } from "../../lib/finance.js";
+import { loanSummary, progressiveTimeline as buildProgressiveTimeline, amortizationSchedule } from "../../lib/housing.js";
 import { toCsv, downloadBlob, printTable } from "../../lib/backup.js";
 import { StatCard } from "../shared/StatCard.jsx";
 import { LabelField } from "../shared/LabelField.jsx";
+
+const safeFloat = (val, max = 1e9) => { const n = parseFloat(val); return isFinite(n) ? Math.min(Math.max(0, n), max) : 0; };
+const safeInt   = (val, max = 1e6) => { const n = parseInt(val, 10); return isFinite(n) ? Math.min(Math.max(0, n), max) : 0; };
 
 export default function HousingLoanTab() {
   const [properties, setProperties] = useState(() => {
@@ -18,7 +22,9 @@ export default function HousingLoanTab() {
   });
 
   const [dpForm, setDpForm] = useState({ date: "", amount: "", note: "" });
+  const [dpError, setDpError] = useState("");
   const [prForm, setPrForm] = useState({ month: "", claimAmount: "", stage: "", note: "" });
+  const [prError, setPrError] = useState("");
   const [showAmort, setShowAmort] = useState(false);
   const [amortYear, setAmortYear] = useState(1);
 
@@ -43,81 +49,49 @@ export default function HousingLoanTab() {
 
   const delProp = () => {
     if (!window.confirm(`Delete "${prop?.name}"? This cannot be undone.`)) return;
-    setProperties(ps => {
-      const next = ps.filter(p => p.id !== effectiveId);
-      const fallback = next.length ? next : [newProperty()];
-      setSelId(fallback[0].id);
-      return fallback;
-    });
+    const next = properties.filter(p => p.id !== effectiveId);
+    const fallback = next.length ? next : [newProperty()];
+    setProperties(fallback);
+    setSelId(fallback[0].id);
   };
 
   const addDP = () => {
-    if (!prop || !dpForm.date || !dpForm.amount) return;
-    const rec = { id: uid(), date: dpForm.date, amount: parseFloat(dpForm.amount) || 0, note: dpForm.note.trim() };
+    if (!dpForm.date || !dpForm.amount) {
+      setDpError(!dpForm.date && !dpForm.amount ? "Date and amount are required." : !dpForm.date ? "Date is required." : "Amount is required.");
+      return;
+    }
+    setDpError("");
+    const rec = { id: uid(), date: dpForm.date, amount: safeFloat(dpForm.amount), note: dpForm.note.trim() };
     upd({ downpaymentRecords: [...(prop.downpaymentRecords || []), rec].sort((a, b) => a.date.localeCompare(b.date)) });
     setDpForm({ date: "", amount: "", note: "" });
   };
 
-  const delDP = (recId) => prop && upd({ downpaymentRecords: prop.downpaymentRecords.filter(r => r.id !== recId) });
+  const delDP = (recId) => prop && upd({ downpaymentRecords: (prop.downpaymentRecords || []).filter(r => r.id !== recId) });
 
   const addPR = () => {
-    if (!prop || !prForm.month || !prForm.claimAmount) return;
-    const rec = { id: uid(), month: prForm.month, claimAmount: parseFloat(prForm.claimAmount) || 0, stage: prForm.stage.trim(), note: prForm.note.trim() };
+    if (!prForm.month || !prForm.claimAmount) {
+      setPrError(!prForm.month && !prForm.claimAmount ? "Month and claim amount are required." : !prForm.month ? "Month is required." : "Claim amount is required.");
+      return;
+    }
+    if ((prop.progressiveRecords || []).some(r => r.month === prForm.month)) {
+      setPrError(`A record for ${prForm.month} already exists. Duplicate months cause incorrect interest calculations.`);
+      return;
+    }
+    setPrError("");
+    const rec = { id: uid(), month: prForm.month, claimAmount: safeFloat(prForm.claimAmount), stage: prForm.stage.trim(), note: prForm.note.trim() };
     upd({ progressiveRecords: [...(prop.progressiveRecords || []), rec].sort((a, b) => a.month.localeCompare(b.month)) });
     setPrForm({ month: "", claimAmount: "", stage: "", note: "" });
   };
 
-  const delPR = (recId) => prop && upd({ progressiveRecords: prop.progressiveRecords.filter(r => r.id !== recId) });
+  const delPR = (recId) => prop && upd({ progressiveRecords: (prop.progressiveRecords || []).filter(r => r.id !== recId) });
 
-  const totalDownpaid = useMemo(() =>
-    (prop?.downpaymentRecords || []).reduce((s, r) => s + (r.amount || 0), 0), [prop]);
+  const { downpaid: totalDownpaid, loanAmount, monthlyInstallment, totalPayable, totalInterest } =
+    useMemo(() => loanSummary(prop), [prop]);
 
-  const loanAmount = Math.max(0, (prop?.purchasePrice || 0) - totalDownpaid);
-  const monthlyInstallment = calcInstallment(loanAmount, prop?.interestRate || 0, prop?.tenure || 0);
-  const totalPayable = monthlyInstallment * (prop?.tenure || 0) * 12;
-  const totalInterest = Math.max(0, totalPayable - loanAmount);
+  const progressiveTimeline = useMemo(() => buildProgressiveTimeline(prop), [prop]);
+  const totalProgInterest = progressiveTimeline.reduce((s, r) => s + r.stageInterestTotal, 0);
 
-  const progressiveTimeline = useMemo(() => {
-    if (!prop) return [];
-    const r = (prop.interestRate || 0) / 100 / 12;
-    let cum = 0;
-    return (prop.progressiveRecords || []).map(rec => {
-      cum += rec.claimAmount || 0;
-      return { ...rec, cumulative: cum, monthlyInterest: cum * r };
-    });
-  }, [prop]);
-
-  const totalProgInterest = progressiveTimeline.reduce((s, r) => s + r.monthlyInterest, 0);
-
-  const amortSchedule = useMemo(() => {
-    if (!loanAmount || !prop?.interestRate || !prop?.tenure || !monthlyInstallment) return [];
-    const r = prop.interestRate / 100 / 12;
-    const n = prop.tenure * 12;
-    let balance = loanAmount;
-
-    // Derive the first repayment month from property dates
-    const refStr = prop.type === "under_construction" ? prop.vpDate : prop.spaDate;
-    let startDate = refStr ? new Date(refStr + "-01") : null;
-    if (startDate && prop.type !== "under_construction") {
-      // Completed/subsale: loan starts ~1 month after SPA
-      startDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 1);
-    }
-
-    return Array.from({ length: n }, (_, idx) => {
-      const i = idx + 1;
-      const interest = balance * r;
-      const principal = Math.min(monthlyInstallment - interest, balance);
-      const closing = Math.max(0, balance - principal);
-      let dateStr = "";
-      if (startDate) {
-        const d = new Date(startDate.getFullYear(), startDate.getMonth() + idx, 1);
-        dateStr = d.toLocaleDateString("en-MY", { month: "short", year: "numeric" });
-      }
-      const row = { month: i, year: Math.ceil(i / 12), date: dateStr, opening: balance, principal, interest, closing };
-      balance = closing;
-      return row;
-    });
-  }, [loanAmount, prop?.interestRate, prop?.tenure, monthlyInstallment, prop?.vpDate, prop?.spaDate, prop?.type]);
+  const amortSchedule = useMemo(() => amortizationSchedule(prop), [prop]);
 
   const amortTotalInterest = amortSchedule.reduce((s, r) => s + r.interest, 0);
   const amortTotalPrincipal = amortSchedule.reduce((s, r) => s + r.principal, 0);
@@ -130,9 +104,7 @@ export default function HousingLoanTab() {
 
   const exportHousingCsv = () => {
     const summaryRows = properties.map(p => {
-      const dp = (p.downpaymentRecords || []).reduce((s, r) => s + (r.amount || 0), 0);
-      const loan = Math.max(0, p.purchasePrice - dp);
-      const inst = calcInstallment(loan, p.interestRate || 0, p.tenure || 0);
+      const { downpaid: dp, loanAmount: loan, monthlyInstallment: inst } = loanSummary(p);
       return {
         Property: p.name, Developer: p.developer, Address: p.address,
         Type: p.type, "Purchase Price (MYR)": p.purchasePrice,
@@ -166,9 +138,7 @@ export default function HousingLoanTab() {
         heading: "Property Summary",
         headers: ["Property", "Purchase Price (MYR)", "Downpaid (MYR)", "Loan (MYR)", "Rate", "Tenure", "Monthly Installment"],
         rows: properties.map(p => {
-          const dp = (p.downpaymentRecords || []).reduce((s, r) => s + (r.amount || 0), 0);
-          const loan = Math.max(0, p.purchasePrice - dp);
-          const inst = calcInstallment(loan, p.interestRate || 0, p.tenure || 0);
+          const { downpaid: dp, loanAmount: loan, monthlyInstallment: inst } = loanSummary(p);
           return [p.name, RM(p.purchasePrice), RM(dp), RM(loan), `${p.interestRate}%`, `${p.tenure} yrs`, RM2(inst)];
         }),
       },
@@ -261,13 +231,13 @@ export default function HousingLoanTab() {
             </select>
           </LabelField>
           <LabelField label="Purchase Price (RM)">
-            <input className="hl-in" type="number" value={prop.purchasePrice} onChange={e => upd({ purchasePrice: parseFloat(e.target.value) || 0 })} min={0} step={1000} style={{ fontFamily: "'DM Mono', monospace" }} />
+            <input className="hl-in" type="number" value={prop.purchasePrice} onChange={e => upd({ purchasePrice: safeFloat(e.target.value, 1e9) })} min={0} step={1000} style={{ fontFamily: "'DM Mono', monospace" }} />
           </LabelField>
           <LabelField label="Interest Rate (% p.a.)">
-            <input className="hl-in" type="number" value={prop.interestRate} onChange={e => upd({ interestRate: parseFloat(e.target.value) || 0 })} min={0} max={20} step={0.05} style={{ fontFamily: "'DM Mono', monospace" }} />
+            <input className="hl-in" type="number" value={prop.interestRate} onChange={e => upd({ interestRate: safeFloat(e.target.value, 20) })} min={0} max={20} step={0.05} style={{ fontFamily: "'DM Mono', monospace" }} />
           </LabelField>
           <LabelField label="Loan Tenure (Years)">
-            <input className="hl-in" type="number" value={prop.tenure} onChange={e => upd({ tenure: parseInt(e.target.value) || 0 })} min={1} max={35} step={1} style={{ fontFamily: "'DM Mono', monospace" }} />
+            <input className="hl-in" type="number" value={prop.tenure} onChange={e => upd({ tenure: safeInt(e.target.value, 35) })} min={1} max={35} step={1} style={{ fontFamily: "'DM Mono', monospace" }} />
           </LabelField>
           <LabelField label="SPA Date">
             <input className="hl-in" type="date" value={prop.spaDate} onChange={e => upd({ spaDate: e.target.value })} />
@@ -277,6 +247,13 @@ export default function HousingLoanTab() {
           </LabelField>
         </div>
       </div>
+
+      {/* Over-downpayment warning */}
+      {prop.purchasePrice > 0 && totalDownpaid > prop.purchasePrice && (
+        <div style={{ marginBottom: 16, padding: "10px 16px", borderRadius: 10, background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.3)", fontSize: 12, color: "#fbbf24", lineHeight: 1.6 }}>
+          ⚠ Total downpayments ({RM(totalDownpaid)}) exceed the purchase price ({RM(prop.purchasePrice)}). Loan amount is shown as RM 0. Check your records for duplicate or incorrect entries.
+        </div>
+      )}
 
       {/* Loan Summary Cards */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
@@ -409,9 +386,12 @@ export default function HousingLoanTab() {
             <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Note</label>
             <input className="hl-in" placeholder="e.g. Booking fee / 10% downpayment" value={dpForm.note} onChange={e => setDpForm(f => ({ ...f, note: e.target.value }))} />
           </div>
-          <button onClick={addDP} style={addBtnStyle}>+ Add</button>
+          <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 4 }}>
+            <button onClick={addDP} style={addBtnStyle}>+ Add</button>
+            {dpError && <span style={{ fontSize: 11, color: "#f87171", whiteSpace: "nowrap" }}>⚠ {dpError}</span>}
+          </div>
         </div>
-        {prop.downpaymentRecords.length > 0 ? (
+        {(prop.downpaymentRecords || []).length > 0 ? (
           <div style={{ overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
@@ -479,14 +459,17 @@ export default function HousingLoanTab() {
               <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Note</label>
               <input className="hl-in" placeholder="Optional" value={prForm.note} onChange={e => setPrForm(f => ({ ...f, note: e.target.value }))} />
             </div>
-            <button onClick={addPR} style={addBtnStyle}>+ Add</button>
+            <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 4 }}>
+              <button onClick={addPR} style={addBtnStyle}>+ Add</button>
+              {prError && <span style={{ fontSize: 11, color: "#f87171", whiteSpace: "nowrap" }}>⚠ {prError}</span>}
+            </div>
           </div>
           {progressiveTimeline.length > 0 ? (
             <div style={{ overflowX: "auto" }}>
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid var(--border)" }}>
-                    {["Month", "Stage", "Claim (RM)", "Cumulative Disbursed", "Monthly Interest", "Note", ""].map(h => (
+                    {["Month", "Stage", "Claim (RM)", "Cumulative Disbursed", "Monthly Interest", "Months", "Stage Interest", "Note", ""].map(h => (
                       <th key={h} style={{ padding: "10px 12px", textAlign: "left", fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" }}>{h}</th>
                     ))}
                   </tr>
@@ -499,6 +482,8 @@ export default function HousingLoanTab() {
                       <td style={{ padding: "10px 12px", fontFamily: "'DM Mono', monospace", fontWeight: 600, color: "#818cf8" }}>{RM(r.claimAmount)}</td>
                       <td style={{ padding: "10px 12px", fontFamily: "'DM Mono', monospace", color: "var(--accent2)" }}>{RM(r.cumulative)}</td>
                       <td style={{ padding: "10px 12px", fontFamily: "'DM Mono', monospace", fontWeight: 700, color: "#f472b6" }}>{RM2(r.monthlyInterest)}</td>
+                      <td style={{ padding: "10px 12px", fontFamily: "'DM Mono', monospace", color: "var(--muted)", textAlign: "center" }}>{r.stageDuration ?? "—"}</td>
+                      <td style={{ padding: "10px 12px", fontFamily: "'DM Mono', monospace", fontWeight: 700, color: "#f472b6" }}>{RM2(r.stageInterestTotal)}</td>
                       <td style={{ padding: "10px 12px", color: "var(--muted)", fontSize: 12 }}>{r.note || "—"}</td>
                       <td style={{ padding: "10px 12px" }}>
                         <button onClick={() => delPR(r.id)} style={{ color: "#f87171", background: "none", border: "none", cursor: "pointer", fontSize: 14, padding: "2px 8px" }}>✕</button>
@@ -508,7 +493,7 @@ export default function HousingLoanTab() {
                 </tbody>
                 <tfoot>
                   <tr style={{ borderTop: "2px solid var(--border)" }}>
-                    <td colSpan={4} style={{ padding: "12px", fontWeight: 700, color: "var(--label)" }}>Est. Total Interest During Construction</td>
+                    <td colSpan={6} style={{ padding: "12px", fontWeight: 700, color: "var(--label)" }}>Est. Total Interest During Construction</td>
                     <td style={{ padding: "12px", fontFamily: "'DM Mono', monospace", fontWeight: 800, color: "#f472b6", fontSize: 15 }}>{RM2(totalProgInterest)}</td>
                     <td colSpan={2} />
                   </tr>
