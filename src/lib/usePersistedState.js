@@ -28,13 +28,24 @@ const serializers = {
     },
     stringify: JSON.stringify,
   },
+  // Like json, but rejects non-array values (guards against corrupted storage
+  // crashing .map/.reduce consumers).
+  jsonArray: {
+    parse: (raw, fallback) => {
+      try {
+        const v = JSON.parse(raw);
+        return Array.isArray(v) ? v : fallback;
+      } catch { return fallback; }
+    },
+    stringify: JSON.stringify,
+  },
 };
 
 /**
  * @param {string} key localStorage key
  * @param {*} fallback default when the key is absent or unparseable;
  *   pass a function for a lazily-computed default (e.g. legacy-key migration)
- * @param {"float"|"string"|"bool"|"json"} type serialization format
+ * @param {"float"|"string"|"bool"|"json"|"jsonArray"} type serialization format
  * @returns {[*, Function]} same contract as useState
  */
 export function usePersistedState(key, fallback, type = "float") {

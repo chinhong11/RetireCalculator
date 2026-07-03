@@ -1,24 +1,17 @@
 import { useState, useEffect, useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { EXPENSE_CATS, EXPENSE_CAT_COLORS } from "../../lib/finance.js";
+import { usePersistedState } from "../../lib/usePersistedState.js";
 
 export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly, salary }) {
-  const [takeHome, setTakeHome]       = useState(() => parseFloat(localStorage.getItem("sav_income") || "0"));
-  const [otherIncome, setOtherIncome] = useState(() => parseFloat(localStorage.getItem("sav_other") || "0"));
-  const [startCash, setStartCash]     = useState(() => parseFloat(localStorage.getItem("sav_start_cash") || "0"));
-  const [cashReturn, setCashReturn]   = useState(() => parseFloat(localStorage.getItem("sav_cash_return") || "0"));
-  const [expenses, setExpenses]       = useState(() => {
-    try { const s = localStorage.getItem("sav_expenses_v1"); return s ? JSON.parse(s) : []; } catch { return []; }
-  });
+  const [takeHome, setTakeHome]       = usePersistedState("sav_income",      0);
+  const [otherIncome, setOtherIncome] = usePersistedState("sav_other",       0);
+  const [startCash, setStartCash]     = usePersistedState("sav_start_cash",  0);
+  const [cashReturn, setCashReturn]   = usePersistedState("sav_cash_return", 0);
+  const [expenses, setExpenses]       = usePersistedState("sav_expenses_v1", [], "json");
   const [form, setForm]     = useState({ category: EXPENSE_CATS[0], amount: "", note: "" });
   const [editId, setEditId] = useState(null);
   const [showForm, setShowForm] = useState(false);
-
-  useEffect(() => { localStorage.setItem("sav_income", takeHome); }, [takeHome]);
-  useEffect(() => { localStorage.setItem("sav_other", otherIncome); }, [otherIncome]);
-  useEffect(() => { localStorage.setItem("sav_start_cash", startCash); }, [startCash]);
-  useEffect(() => { localStorage.setItem("sav_cash_return", cashReturn); }, [cashReturn]);
-  useEffect(() => { try { localStorage.setItem("sav_expenses_v1", JSON.stringify(expenses)); } catch {} }, [expenses]);
 
   const [goals,    setGoals]    = useState(() => { try { const s = localStorage.getItem("goals_v1"); return s ? JSON.parse(s) : []; } catch { return []; } });
   const [fxUsdSgd, setFxUsdSgd] = useState(() => parseFloat(localStorage.getItem("fx_usd_sgd") || "1.35"));

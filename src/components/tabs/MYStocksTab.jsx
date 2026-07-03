@@ -3,15 +3,10 @@ import { RM, RM2, uid } from "../../lib/finance.js";
 import { toCsv, downloadBlob, printTable } from "../../lib/backup.js";
 import { StatCard } from "../shared/StatCard.jsx";
 import { fetchYahooChart } from "../../lib/fetchPrice.js";
+import { usePersistedState } from "../../lib/usePersistedState.js";
 
 export default function MYStocksTab() {
-  const [holdings, setHoldings] = useState(() => {
-    try {
-      const s = localStorage.getItem("mystocks_v1");
-      if (s) { const h = JSON.parse(s); if (Array.isArray(h)) return h; }
-    } catch {}
-    return [];
-  });
+  const [holdings, setHoldings] = usePersistedState("mystocks_v1", [], "jsonArray");
 
   const [prices, setPrices] = useState({});
   const [fetching, setFetching] = useState(new Set());
@@ -20,10 +15,6 @@ export default function MYStocksTab() {
   const [refreshedAt, setRefreshedAt] = useState(null);
   const [editingPrice, setEditingPrice] = useState(new Set());
   const [manualInput, setManualInput] = useState({});
-
-  useEffect(() => {
-    try { localStorage.setItem("mystocks_v1", JSON.stringify(holdings)); } catch {}
-  }, [holdings]);
 
   useEffect(() => {
     if (Object.keys(prices).length === 0) return;

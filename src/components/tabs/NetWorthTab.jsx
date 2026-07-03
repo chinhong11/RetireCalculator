@@ -3,14 +3,12 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { projectEpfYears } from "../../lib/epf.js";
 import { fetchFxRates } from "../../lib/fetchFx.js";
 import { totalDownpayment } from "../../lib/housing.js";
+import { usePersistedState } from "../../lib/usePersistedState.js";
 
 export default function NetWorthTab({ projectionData, yearsToProject }) {
-  const [usdToSgd, setUsdToSgd] = useState(() => parseFloat(localStorage.getItem("fx_usd_sgd") || "1.35"));
-  const [myrToSgd, setMyrToSgd] = useState(() => parseFloat(localStorage.getItem("fx_myr_sgd") || "0.30"));
+  const [usdToSgd, setUsdToSgd] = usePersistedState("fx_usd_sgd", 1.35);
+  const [myrToSgd, setMyrToSgd] = usePersistedState("fx_myr_sgd", 0.30);
   const [fxStatus, setFxStatus] = useState("idle"); // "idle" | "loading" | "live" | "error"
-
-  useEffect(() => { localStorage.setItem("fx_usd_sgd", usdToSgd); }, [usdToSgd]);
-  useEffect(() => { localStorage.setItem("fx_myr_sgd", myrToSgd); }, [myrToSgd]);
 
   useEffect(() => {
     setFxStatus("loading");

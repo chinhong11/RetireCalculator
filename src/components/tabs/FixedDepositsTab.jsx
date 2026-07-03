@@ -1,22 +1,13 @@
-import { useState, useEffect, useMemo } from "react";
+import { useState, useMemo } from "react";
 import { calcFd, FD_EMPTY } from "../../lib/finance.js";
 import { downloadBlob, toCsv } from "../../lib/backup.js";
+import { usePersistedState } from "../../lib/usePersistedState.js";
 
 export default function FixedDepositsTab() {
-  const [deposits, setDeposits] = useState(() => {
-    try {
-      const s = localStorage.getItem("fd_v1");
-      if (s) { const d = JSON.parse(s); if (Array.isArray(d)) return d; }
-    } catch {}
-    return [];
-  });
+  const [deposits, setDeposits] = usePersistedState("fd_v1", [], "jsonArray");
   const [form, setForm] = useState({ ...FD_EMPTY });
   const [editId, setEditId] = useState(null);
   const [showForm, setShowForm] = useState(false);
-
-  useEffect(() => {
-    try { localStorage.setItem("fd_v1", JSON.stringify(deposits)); } catch {}
-  }, [deposits]);
 
   const fmtRM = v => "RM " + v.toFixed(2).replace(/\B(?=(\d{3})+(?!\d))/g, ",");
 

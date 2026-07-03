@@ -1,18 +1,14 @@
-import { useState, useEffect, useMemo } from "react";
+import { useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { projectEpfYears } from "../../lib/epf.js";
 import { totalDownpayment } from "../../lib/housing.js";
+import { usePersistedState } from "../../lib/usePersistedState.js";
 
 export default function FireTab({ projectionData, yearsToProject }) {
-  const [monthlyExpenses, setMonthlyExpenses] = useState(() => parseFloat(localStorage.getItem("fire_monthly_exp") || "3000"));
-  const [withdrawalRate,  setWithdrawalRate]  = useState(() => parseFloat(localStorage.getItem("fire_rate") || "4"));
-  const [includeEpf,      setIncludeEpf]      = useState(() => localStorage.getItem("fire_incl_epf")  !== "false");
-  const [includeCash,     setIncludeCash]     = useState(() => localStorage.getItem("fire_incl_cash") !== "false");
-
-  useEffect(() => { localStorage.setItem("fire_monthly_exp", monthlyExpenses); }, [monthlyExpenses]);
-  useEffect(() => { localStorage.setItem("fire_rate",        withdrawalRate);  }, [withdrawalRate]);
-  useEffect(() => { localStorage.setItem("fire_incl_epf",   includeEpf);      }, [includeEpf]);
-  useEffect(() => { localStorage.setItem("fire_incl_cash",  includeCash);     }, [includeCash]);
+  const [monthlyExpenses, setMonthlyExpenses] = usePersistedState("fire_monthly_exp", 3000);
+  const [withdrawalRate,  setWithdrawalRate]  = usePersistedState("fire_rate",           4);
+  const [includeEpf,      setIncludeEpf]      = usePersistedState("fire_incl_epf",  true, "bool");
+  const [includeCash,     setIncludeCash]     = usePersistedState("fire_incl_cash", true, "bool");
 
   const usdToSgd = useMemo(() => parseFloat(localStorage.getItem("fx_usd_sgd") || "1.35"), []);
   const myrToSgd = useMemo(() => parseFloat(localStorage.getItem("fx_myr_sgd") || "0.30"), []);

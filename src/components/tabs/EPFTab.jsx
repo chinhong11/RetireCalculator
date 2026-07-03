@@ -1,28 +1,18 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { EPF_PER, EPF_SEJ, EPF_FLK, computeEpfMonthly, projectEpfYears } from "../../lib/epf.js";
+import { usePersistedState } from "../../lib/usePersistedState.js";
 
 export default function EPFTab() {
-  const [wage, setWage] = useState(() => parseFloat(localStorage.getItem("epf_wage") || "5000"));
-  const [age, setAge] = useState(() => parseInt(localStorage.getItem("epf_age") || "30"));
-  const [retireAge, setRetireAge] = useState(() => parseInt(localStorage.getItem("epf_retire_age") || "60"));
-  const [annualIncrement, setAnnualIncrement] = useState(() => parseFloat(localStorage.getItem("epf_increment") || "3"));
-  const [dividendRate, setDividendRate] = useState(() => parseFloat(localStorage.getItem("epf_dividend") || "5.5"));
-  const [startPer, setStartPer] = useState(() => parseFloat(localStorage.getItem("epf_per_start") || "0"));
-  const [startSej, setStartSej] = useState(() => parseFloat(localStorage.getItem("epf_sej_start") || "0"));
-  const [startFlek, setStartFlek] = useState(() => parseFloat(localStorage.getItem("epf_flek_start") || "0"));
+  const [wage, setWage]                       = usePersistedState("epf_wage",       5000);
+  const [age, setAge]                         = usePersistedState("epf_age",          30);
+  const [retireAge, setRetireAge]             = usePersistedState("epf_retire_age",   60);
+  const [annualIncrement, setAnnualIncrement] = usePersistedState("epf_increment",     3);
+  const [dividendRate, setDividendRate]       = usePersistedState("epf_dividend",    5.5);
+  const [startPer, setStartPer]               = usePersistedState("epf_per_start",     0);
+  const [startSej, setStartSej]               = usePersistedState("epf_sej_start",     0);
+  const [startFlek, setStartFlek]             = usePersistedState("epf_flek_start",    0);
   const [epfTab, setEpfTab] = useState("chart");
-
-  useEffect(() => {
-    localStorage.setItem("epf_wage", wage);
-    localStorage.setItem("epf_age", age);
-    localStorage.setItem("epf_retire_age", retireAge);
-    localStorage.setItem("epf_increment", annualIncrement);
-    localStorage.setItem("epf_dividend", dividendRate);
-    localStorage.setItem("epf_per_start", startPer);
-    localStorage.setItem("epf_sej_start", startSej);
-    localStorage.setItem("epf_flek_start", startFlek);
-  }, [wage, age, retireAge, annualIncrement, dividendRate, startPer, startSej, startFlek]);
 
   const years = Math.max(1, retireAge - age);
   const monthly = useMemo(() => computeEpfMonthly(wage, age), [wage, age]);

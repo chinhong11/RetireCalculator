@@ -85,6 +85,26 @@ describe("usePersistedState — json", () => {
   });
 });
 
+describe("usePersistedState — jsonArray", () => {
+  it("round-trips arrays", () => {
+    localStorage.setItem("t_arr", JSON.stringify([1, 2, 3]));
+    const { result } = renderHook(() => usePersistedState("t_arr", [], "jsonArray"));
+    expect(result.current[0]).toEqual([1, 2, 3]);
+  });
+
+  it("rejects a stored non-array value (falls back)", () => {
+    localStorage.setItem("t_arr", JSON.stringify({ hacked: true }));
+    const { result } = renderHook(() => usePersistedState("t_arr", ["fb"], "jsonArray"));
+    expect(result.current[0]).toEqual(["fb"]);
+  });
+
+  it("corrupt JSON falls back", () => {
+    localStorage.setItem("t_arr", "[broken");
+    const { result } = renderHook(() => usePersistedState("t_arr", [], "jsonArray"));
+    expect(result.current[0]).toEqual([]);
+  });
+});
+
 describe("usePersistedState — lazy fallback (legacy migration)", () => {
   it("invokes a function fallback when the key is absent", () => {
     localStorage.setItem("legacy_amount", "40000");

@@ -2,15 +2,10 @@ import { useState, useMemo, useEffect } from "react";
 import { USD, uid, COIN_IDS, fmtCoin } from "../../lib/finance.js";
 import { toCsv, downloadBlob, printTable } from "../../lib/backup.js";
 import { StatCard } from "../shared/StatCard.jsx";
+import { usePersistedState } from "../../lib/usePersistedState.js";
 
 export default function CryptoTab() {
-  const [holdings, setHoldings] = useState(() => {
-    try {
-      const s = localStorage.getItem("crypto_v1");
-      if (s) { const h = JSON.parse(s); if (Array.isArray(h)) return h; }
-    } catch {}
-    return [];
-  });
+  const [holdings, setHoldings] = usePersistedState("crypto_v1", [], "jsonArray");
 
   const [prices, setPrices] = useState({});
   const [fetching, setFetching] = useState(new Set());
@@ -24,10 +19,6 @@ export default function CryptoTab() {
   const [dcaAddAmount, setDcaAddAmount] = useState("");
   const [dcaAddPrice, setDcaAddPrice] = useState("");
   const [dcaAddFees, setDcaAddFees] = useState("0");
-
-  useEffect(() => {
-    try { localStorage.setItem("crypto_v1", JSON.stringify(holdings)); } catch {}
-  }, [holdings]);
 
   useEffect(() => {
     if (Object.keys(prices).length === 0) return;

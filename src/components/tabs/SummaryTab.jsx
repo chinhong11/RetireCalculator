@@ -1,6 +1,7 @@
 import { useState, useEffect, useMemo } from "react";
 import { RM, USD, uid } from "../../lib/finance.js";
 import { totalDownpayment } from "../../lib/housing.js";
+import { usePersistedState } from "../../lib/usePersistedState.js";
 
 function lsJson(key) {
   try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : []; } catch { return []; }
@@ -46,14 +47,8 @@ export default function SummaryTab({ cpfData, yearsToProject, projectionData }) 
   const cryptoCost   = cryptoHoldings.reduce((s, h)  => s + h.amount * h.buyPrice + (h.totalFees || 0), 0);
   const totalUSD     = stocksCost + cryptoCost;
 
-  const [goals, setGoals] = useState(() => {
-    try { const s = localStorage.getItem("goals_v1"); return s ? JSON.parse(s) : []; } catch { return []; }
-  });
+  const [goals, setGoals] = usePersistedState("goals_v1", [], "jsonArray");
   const [goalForm, setGoalForm] = useState({ name: "", currency: "SGD", target: "", targetAge: "", notes: "" });
-
-  useEffect(() => {
-    try { localStorage.setItem("goals_v1", JSON.stringify(goals)); } catch {}
-  }, [goals]);
 
   const addGoal = () => {
     if (!goalForm.name.trim() || !goalForm.target) return;
