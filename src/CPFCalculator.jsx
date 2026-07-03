@@ -4,6 +4,8 @@ import { OW_CEILING, CPF_FRS_2026, CPF_BHS_2026, computeMonthly, projectYears, e
 import { exportCpfPdf } from "./lib/exportPdf.js";
 import { useCloudSync } from "./lib/useCloudSync.js";
 
+import { usePersistedState } from "./lib/usePersistedState.js";
+
 import { SliderInput }       from "./components/shared/SliderInput.jsx";
 import { BackupBar }         from "./components/shared/BackupBar.jsx";
 import { ErrorBoundary }     from "./components/shared/ErrorBoundary.jsx";
@@ -126,38 +128,33 @@ function StepLabel({ n, title, optional }) {
   );
 }
 
-// ─── Helpers ──────────────────────────────────────────────────────────────────
-/** @param {string} key @param {number} fallback @returns {number} */
-function lsFloat(key, fallback) {
-  try { return parseFloat(localStorage.getItem(key) || String(fallback)) || fallback; } catch { return fallback; }
-}
-
 export default function CPFCalculator() {
   // ─── Theme ──────────────────────────────────────────────────────────────
-  const [theme, setTheme] = useState(() => localStorage.getItem("theme") || "dark");
-  useEffect(() => { localStorage.setItem("theme", theme); }, [theme]);
-  const tv = THEMES[theme];
+  const [theme, setTheme] = usePersistedState("theme", "dark", "string");
+  const tv = THEMES[theme] || THEMES.dark;
 
-  // ─── Core inputs ────────────────────────────────────────────────────────
-  const [salary, setSalary]                     = useState(() => lsFloat("cpf_salary",    5000));
-  const [age, setAge]                           = useState(() => lsFloat("cpf_age",        30));
-  const [prYear, setPrYear]                     = useState(() => lsFloat("cpf_pr_year",     1));
-  const [annualIncrement, setAnnualIncrement]   = useState(() => lsFloat("cpf_increment",   3));
-  const [yearsToProject, setYearsToProject]     = useState(() => lsFloat("cpf_years",      20));
-  const [oaReturn, setOaReturn]                 = useState(() => lsFloat("cpf_oa_return",  2.5));
-  const [saReturn, setSaReturn]                 = useState(() => lsFloat("cpf_sa_return",  4.0));
-  const [maReturn, setMaReturn]                 = useState(() => lsFloat("cpf_ma_return",  4.0));
-  const [oaStart, setOaStart]   = useState(() => lsFloat("cpf_oa_start",       0));
-  const [saStart, setSaStart]   = useState(() => lsFloat("cpf_sa_start",       0));
-  const [maStart, setMaStart]   = useState(() => lsFloat("cpf_ma_start",       0));
-  const [ceilingGrowth, setCeilingGrowth] = useState(() => lsFloat("cpf_ceiling_growth", 3.5));
-  const [saShield, setSaShield]     = useState(() => lsFloat("cpf_sa_shield", 0));
-  const [saShieldOn, setSaShieldOn] = useState(() => {
-    // Prefer the dedicated boolean key; fall back to old behaviour for existing users
-    const explicit = localStorage.getItem("cpf_sa_shield_on");
-    return explicit !== null ? explicit === "true" : lsFloat("cpf_sa_shield", 0) > 0;
-  });
-  const [activeTab, setActiveTab]   = useState(() => localStorage.getItem("active_tab") || "summary");
+  // ─── Core inputs (all persisted to localStorage) ────────────────────────
+  const [salary, setSalary]                   = usePersistedState("cpf_salary",    5000);
+  const [age, setAge]                         = usePersistedState("cpf_age",         30);
+  const [prYear, setPrYear]                   = usePersistedState("cpf_pr_year",      1);
+  const [annualIncrement, setAnnualIncrement] = usePersistedState("cpf_increment",    3);
+  const [yearsToProject, setYearsToProject]   = usePersistedState("cpf_years",       20);
+  const [oaReturn, setOaReturn]               = usePersistedState("cpf_oa_return",  2.5);
+  const [saReturn, setSaReturn]               = usePersistedState("cpf_sa_return",  4.0);
+  const [maReturn, setMaReturn]               = usePersistedState("cpf_ma_return",  4.0);
+  const [oaStart, setOaStart]                 = usePersistedState("cpf_oa_start",     0);
+  const [saStart, setSaStart]                 = usePersistedState("cpf_sa_start",     0);
+  const [maStart, setMaStart]                 = usePersistedState("cpf_ma_start",     0);
+  const [ceilingGrowth, setCeilingGrowth]     = usePersistedState("cpf_ceiling_growth", 3.5);
+  const [saShield, setSaShield]               = usePersistedState("cpf_sa_shield",    0);
+  const [saShieldOn, setSaShieldOn] = usePersistedState(
+    "cpf_sa_shield_on",
+    // Legacy migration: users from before the dedicated boolean key existed
+    // had "shield on" implied by a positive cpf_sa_shield amount.
+    () => { try { return parseFloat(localStorage.getItem("cpf_sa_shield")) > 0; } catch { return false; } },
+    "bool",
+  );
+  const [activeTab, setActiveTab] = usePersistedState("active_tab", "summary", "string");
   const [pdfBusy, setPdfBusy]       = useState(false);
   const [pdfError, setPdfError]     = useState(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
@@ -168,23 +165,6 @@ export default function CPFCalculator() {
 
   // ─── Cloud sync ─────────────────────────────────────────────────────────
   const { user, syncing, syncError, signOut } = useCloudSync(syncTrigger);
-
-  // ─── Persistence ────────────────────────────────────────────────────────
-  useEffect(() => { try { localStorage.setItem("active_tab",        activeTab);                  } catch {} }, [activeTab]);
-  useEffect(() => { try { localStorage.setItem("cpf_salary",         salary);                    } catch {} }, [salary]);
-  useEffect(() => { try { localStorage.setItem("cpf_age",            age);                       } catch {} }, [age]);
-  useEffect(() => { try { localStorage.setItem("cpf_pr_year",        prYear);                    } catch {} }, [prYear]);
-  useEffect(() => { try { localStorage.setItem("cpf_increment",      annualIncrement);            } catch {} }, [annualIncrement]);
-  useEffect(() => { try { localStorage.setItem("cpf_years",          yearsToProject);             } catch {} }, [yearsToProject]);
-  useEffect(() => { try { localStorage.setItem("cpf_oa_return",      oaReturn);                  } catch {} }, [oaReturn]);
-  useEffect(() => { try { localStorage.setItem("cpf_sa_return",      saReturn);                  } catch {} }, [saReturn]);
-  useEffect(() => { try { localStorage.setItem("cpf_ma_return",      maReturn);                  } catch {} }, [maReturn]);
-  useEffect(() => { try { localStorage.setItem("cpf_oa_start",       oaStart);                   } catch {} }, [oaStart]);
-  useEffect(() => { try { localStorage.setItem("cpf_sa_start",       saStart);                   } catch {} }, [saStart]);
-  useEffect(() => { try { localStorage.setItem("cpf_ma_start",       maStart);                   } catch {} }, [maStart]);
-  useEffect(() => { try { localStorage.setItem("cpf_ceiling_growth", ceilingGrowth);             } catch {} }, [ceilingGrowth]);
-  useEffect(() => { try { localStorage.setItem("cpf_sa_shield",    saShield);    } catch {} }, [saShield]);
-  useEffect(() => { try { localStorage.setItem("cpf_sa_shield_on", saShieldOn); } catch {} }, [saShieldOn]);
 
   // Increment syncTrigger whenever any persisted value changes so useCloudSync debounces an outbound write
   useEffect(() => { setSyncTrigger(n => n + 1); },
