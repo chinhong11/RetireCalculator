@@ -16,9 +16,15 @@ function readLocalData() {
   return data;
 }
 
-function writeLocalData(data) {
-  for (const [key, val] of Object.entries(data)) {
-    try { localStorage.setItem(key, String(val)); } catch {}
+// Make local storage mirror the remote snapshot exactly: keys absent from
+// the snapshot are REMOVED, otherwise data deleted on another device would
+// survive here and get pushed back to the cloud on the next edit.
+export function writeLocalData(data) {
+  for (const key of LS_KEYS) {
+    try {
+      if (key in data) localStorage.setItem(key, String(data[key]));
+      else localStorage.removeItem(key);
+    } catch {}
   }
 }
 

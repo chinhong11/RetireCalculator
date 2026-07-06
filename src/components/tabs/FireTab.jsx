@@ -20,7 +20,9 @@ export default function FireTab({ projectionData, yearsToProject }) {
   const fdList         = useMemo(() => { try { const s = localStorage.getItem("fd_v1");       return s ? JSON.parse(s) : []; } catch { return []; } }, []);
 
   const epfSettings = useMemo(() => ({
-    wage:      parseFloat(localStorage.getItem("epf_wage")       || "0"),
+    // ?? not ||: default must match EPFTab's (5000) only when the key has
+    // never been written, or net worth jumps after first visiting that tab
+    wage:      parseFloat(localStorage.getItem("epf_wage")       ?? "5000"),
     age:       parseInt(localStorage.getItem("epf_age")          || "30"),
     increment: parseFloat(localStorage.getItem("epf_increment")  || "3"),
     dividend:  parseFloat(localStorage.getItem("epf_dividend")   || "5.5"),
@@ -72,6 +74,7 @@ export default function FireTab({ projectionData, yearsToProject }) {
     try { const s = localStorage.getItem("sav_expenses_v1"); if (s) JSON.parse(s).forEach(e => { exp += parseFloat(e.amount) || 0; }); } catch {}
     return Math.max(0, inc - exp);
   }, []);
+  const startCash = useMemo(() => parseFloat(localStorage.getItem("sav_start_cash") || "0"), []);
 
   const annualExpenses = monthlyExpenses * 12;
   const fireNumber     = annualExpenses / (withdrawalRate / 100);
@@ -81,9 +84,9 @@ export default function FireTab({ projectionData, yearsToProject }) {
     const epfMYR       = i === 0 ? epfStart : (epfProjection[i - 1]?.total ?? epfStart);
     const epf          = includeEpf ? Math.round(epfMYR * myrToSgd) : 0;
     const staticAssets = Math.round((housingEquity + myStockValue + fdPrincipal) * myrToSgd + (stocksValue + cryptoValue) * usdToSgd);
-    const cash         = includeCash ? Math.round(monthlySavings * 12 * i) : 0;
+    const cash         = includeCash ? Math.round(startCash + monthlySavings * 12 * i) : 0;
     return { year: i, age: d.age, cpf, epf, staticAssets, cash, total: cpf + epf + staticAssets + cash, fireTarget: fireNumber };
-  }), [projectionData, epfProjection, epfStart, myrToSgd, usdToSgd, housingEquity, myStockValue, fdPrincipal, stocksValue, cryptoValue, monthlySavings, includeEpf, includeCash, fireNumber]);
+  }), [projectionData, epfProjection, epfStart, myrToSgd, usdToSgd, housingEquity, myStockValue, fdPrincipal, stocksValue, cryptoValue, monthlySavings, startCash, includeEpf, includeCash, fireNumber]);
 
   const currentWealth = combinedProjection[0]?.total || 0;
   const fireProgress  = fireNumber > 0 ? Math.min(100, (currentWealth / fireNumber) * 100) : 0;

@@ -2,6 +2,7 @@
 import { describe, it, expect, beforeEach } from "vitest";
 
 import { decideSyncAction } from "../syncDecision.js";
+import { writeLocalData } from "../useCloudSync.js";
 import { collectBackupData, restoreBackupData, LS_KEYS } from "../backup.js";
 
 // ─── decideSyncAction — the data-loss-critical decision matrix ────────────────
@@ -40,6 +41,28 @@ describe("decideSyncAction", () => {
     // The sign-in clobber bug scenario: newer anonymous local data vs an old
     // cloud snapshot. Must surface a conflict, not auto-pull.
     expect(decideSyncAction(B, A, null)).toBe("conflict");
+  });
+});
+
+// ─── writeLocalData — cloud pull must mirror deletions ────────────────────────
+
+describe("writeLocalData", () => {
+  beforeEach(() => localStorage.clear());
+
+  it("removes local keys absent from the remote snapshot (deletions propagate)", () => {
+    localStorage.setItem("stocks_v1", JSON.stringify([{ id: "old" }])); // deleted on device 1
+    localStorage.setItem("cpf_salary", "4000");
+
+    writeLocalData({ cpf_salary: "6000" }); // remote snapshot has no stocks_v1
+
+    expect(localStorage.getItem("cpf_salary")).toBe("6000");
+    expect(localStorage.getItem("stocks_v1")).toBeNull(); // resurrected pre-fix
+  });
+
+  it("does not touch keys outside LS_KEYS", () => {
+    localStorage.setItem("_cloud_sync_base", "{}");
+    writeLocalData({ cpf_salary: "6000" });
+    expect(localStorage.getItem("_cloud_sync_base")).toBe("{}");
   });
 });
 

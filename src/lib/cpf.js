@@ -195,6 +195,19 @@ export function projectYears({
   for (let y = 0; y <= yearsToProject; y++) {
     // BHS and FRS for year y (grown y years from the 2026 base values).
     const currentBhs = Math.round(bhs * Math.pow(1 + bhsGrowthRate / 100, y));
+    const currentFrs = Math.round(frs * Math.pow(1 + frsGrowthRate / 100, y));
+
+    // MA above BHS overflows to SA before 55. After 55 it goes to RA only up
+    // to the FRS; any remainder is paid to OA (CPF Board rule).
+    const overflowMa = () => {
+      if (maBalance <= currentBhs) return;
+      const ov = maBalance - currentBhs;
+      maBalance = currentBhs;
+      if (!raFormed) { saBalance += ov; return; }
+      const toRa = Math.min(ov, Math.max(0, currentFrs - raBalance));
+      raBalance += toRa;
+      oaBalance += ov - toRa;
+    };
 
     if (y > 0) {
       // 1. Base interest
@@ -204,12 +217,8 @@ export function projectYears({
       if (cpfisBalance > 0) cpfisBalance *= (1 + saReturn / 100);
       maBalance *= (1 + maReturn / 100);
 
-      // MA interest overflow → SA/RA
-      if (maBalance > currentBhs) {
-        const ov = maBalance - currentBhs;
-        maBalance = currentBhs;
-        if (raFormed) raBalance += ov; else saBalance += ov;
-      }
+      // MA interest overflow → SA/RA (FRS-capped) / OA
+      overflowMa();
 
       // 2. Advance age/salary before contributions so Year N shows the state
       //    at the end of that year (age = starting_age + N). Same convention as EPF.
@@ -222,8 +231,7 @@ export function projectYears({
         raFormed  = true;
         raBalance = saBalance;   // only the uninvested (non-shielded) SA
         saBalance = 0;
-        const effectiveFrs = Math.round(frs * Math.pow(1 + frsGrowthRate / 100, y));
-        const topUp = Math.min(oaBalance, Math.max(0, effectiveFrs - raBalance));
+        const topUp = Math.min(oaBalance, Math.max(0, currentFrs - raBalance));
         raBalance  += topUp;
         oaBalance  -= topUp;
         // Liquidate CPFIS-SA → OA (user sells investments, proceeds credited to OA)
@@ -257,12 +265,8 @@ export function projectYears({
       else          saBalance += monthly.saAmount * 12;
       maBalance += monthly.maAmount * 12;
 
-      // MA contribution overflow → SA/RA
-      if (maBalance > currentBhs) {
-        const ov = maBalance - currentBhs;
-        maBalance = currentBhs;
-        if (raFormed) raBalance += ov; else saBalance += ov;
-      }
+      // MA contribution overflow → SA/RA (FRS-capped) / OA
+      overflowMa();
     }
 
     data.push({

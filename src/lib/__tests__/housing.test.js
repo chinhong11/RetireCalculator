@@ -146,6 +146,14 @@ describe("amortizationSchedule", () => {
     expect(s[0].date).toMatch(/Apr 2026/);
   });
 
+  it("accepts full YYYY-MM-DD dates from <input type=date> (regression: Invalid Date)", () => {
+    const s = amortizationSchedule({ ...baseProp, vpDate: "2027-06-15" });
+    expect(s[0].date).toMatch(/Jun 2027/);
+    expect(s[0].date).not.toMatch(/Invalid/);
+    const c = amortizationSchedule({ ...baseProp, type: "completed", spaDate: "2026-03-10" });
+    expect(c[0].date).toMatch(/Apr 2026/);
+  });
+
   it("no reference date → empty date strings", () => {
     expect(amortizationSchedule(baseProp)[0].date).toBe("");
   });
@@ -190,6 +198,12 @@ describe("progressiveTimeline", () => {
 
   it("totalProgressiveInterest sums all stages", () => {
     expect(totalProgressiveInterest(prog)).toBeCloseTo((333.3333 + 666.6667) * 6, 1);
+  });
+
+  it("full YYYY-MM-DD VP date gives the last stage its real duration (regression: NaN → 1 month)", () => {
+    const t = progressiveTimeline({ ...prog, vpDate: "2027-01-15" });
+    expect(t[1].stageDuration).toBe(6); // Jul 2026 → Jan 2027, not null
+    expect(t[1].stageInterestTotal).toBeCloseTo(666.6667 * 6, 1);
   });
 
   it("no VP date → last stage falls back to a single month of interest", () => {

@@ -127,6 +127,39 @@ describe("computeMonthly", () => {
 
 // ─── projectYears ─────────────────────────────────────────────────────────────
 
+describe("projectYears — MA overflow respects FRS cap after 55", () => {
+  it("routes MA-above-BHS excess to OA once RA is at the FRS (not into RA)", () => {
+    // Age 60, RA already at FRS, MA at BHS, 10% MA return with flat ceilings:
+    // all MA interest overflows, and with zero FRS headroom it must land in OA.
+    const rows = projectYears({
+      salary: 0, age: 60, prYear: 3, annualIncrement: 0, yearsToProject: 1,
+      oaReturn: 0, saReturn: 0, maReturn: 10,
+      oaStart: 0, saStart: CPF_FRS_2026, maStart: CPF_BHS_2026,
+      frsGrowthRate: 0, bhsGrowthRate: 0,
+    });
+    const r1 = rows[1];
+    const overflow = CPF_BHS_2026 * 0.10;
+    expect(r1.ma).toBeCloseTo(CPF_BHS_2026, 0);      // MA frozen at BHS
+    expect(r1.oa).toBeCloseTo(overflow, 0);          // excess lands in OA
+    // RA gains only the extra-interest credit (2% × 30k + 1% × 30k = 900),
+    // NOT the MA overflow — pre-fix it was FRS + overflow + 900
+    expect(r1.ra).toBeCloseTo(CPF_FRS_2026 + 900, 0);
+  });
+
+  it("before 55 the overflow still goes to SA (unchanged)", () => {
+    const rows = projectYears({
+      salary: 0, age: 40, prYear: 3, annualIncrement: 0, yearsToProject: 1,
+      oaReturn: 0, saReturn: 0, maReturn: 10,
+      oaStart: 0, saStart: 0, maStart: CPF_BHS_2026,
+      frsGrowthRate: 0, bhsGrowthRate: 0,
+    });
+    const r1 = rows[1];
+    expect(r1.ma).toBeCloseTo(CPF_BHS_2026, 0);
+    expect(r1.sa).toBeGreaterThanOrEqual(CPF_BHS_2026 * 0.10); // overflow + extra interest
+    expect(r1.oa).toBe(0);
+  });
+});
+
 describe("projectYears", () => {
   const base = { salary: 5000, age: 30, prYear: 3, annualIncrement: 0, yearsToProject: 2, oaReturn: 2.5, saReturn: 4, maReturn: 4 };
 
