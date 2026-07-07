@@ -12,7 +12,7 @@ import {
   getEpfRates, computeEpfMonthly, projectEpfYears,
 } from "../epf.js";
 
-import { calcInstallment, calcFd } from "../finance.js";
+import { calcInstallment, calcFd, fmtCoin } from "../finance.js";
 import { runMigrations, SCHEMA_KEY, CURRENT_VERSION } from "../migrations.js";
 
 // ─── CPF rate-table lookups ───────────────────────────────────────────────────
@@ -425,6 +425,35 @@ describe("calcFd", () => {
     const r = calcFd({ principal: "80000", rate: "3.5", tenureMonths: "9" });
     expect(r.maturityValue).toBeCloseTo(r.interest + 80000, 6);
   });
+
+  it("maturityDate is startDate advanced by the tenure in months", () => {
+    // Mar 2026 + 12 months = Mar 2027
+    const r = calcFd({ principal: "50000", rate: "3.85", tenureMonths: "12", startDate: "2026-03" });
+    expect(r.maturityDate).toMatch(/Mar 2027/);
+  });
+
+  it("maturityDate rolls over the year boundary correctly", () => {
+    // Oct 2026 + 6 months = Apr 2027
+    const r = calcFd({ principal: "50000", rate: "3.85", tenureMonths: "6", startDate: "2026-10" });
+    expect(r.maturityDate).toMatch(/Apr 2027/);
+  });
+
+  it("maturityDate is null when no startDate is given", () => {
+    expect(calcFd({ principal: "50000", rate: "3.85", tenureMonths: "12" }).maturityDate).toBeNull();
+  });
+});
+
+// ─── fmtCoin (crypto price formatting) ───────────────────────────────────────
+
+describe("fmtCoin", () => {
+  it("null → em dash", () => expect(fmtCoin(null)).toBe("—"));
+  it(">= 1000 uses thousands separators, ≤2 dp", () => expect(fmtCoin(65000)).toBe("$65,000"));
+  it("1..999 → 2 dp", () => expect(fmtCoin(12.5)).toBe("$12.50"));
+  it("0.01..1 → 4 dp", () => expect(fmtCoin(0.1234)).toBe("$0.1234"));
+  it("0.000001..0.01 → 6 dp", () => expect(fmtCoin(0.00005)).toBe("$0.000050"));
+  // Sub-micro prices fall through to toPrecision(4), which JS renders in
+  // scientific notation — a known cosmetic quirk for ultra-cheap tokens.
+  it("sub-micro → 4 significant figures (scientific notation)", () => expect(fmtCoin(0.00000001234)).toBe("$1.234e-8"));
 });
 
 // ─── FIRE number invariant ────────────────────────────────────────────────────
