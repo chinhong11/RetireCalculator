@@ -5,5 +5,13 @@ export default defineConfig({
   plugins: [react()],
   test: {
     environment: 'node',
+    coverage: {
+      provider: 'v8',
+      reporter: ['text', 'html'],
+      // Focus coverage on the logic we actually test; exclude entry points,
+      // config, and pure-presentation shells that carry no branching logic.
+      include: ['src/lib/**', 'src/components/**'],
+      exclude: ['src/**/__tests__/**', 'src/main.jsx', 'src/lib/supabase.js'],
+    },
   },
 })

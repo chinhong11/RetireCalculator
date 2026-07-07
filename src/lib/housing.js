@@ -24,10 +24,20 @@ export function loanSummary(property) {
   return { downpaid, loanAmount, monthlyInstallment, totalPayable, totalInterest };
 }
 
-/** Whole months between two "YYYY-MM" strings (end − start). */
-function monthsBetween(startYm, endYm) {
-  const s = new Date(startYm + "-01");
-  const e = new Date(endYm + "-01");
+/**
+ * First day of the month for a "YYYY-MM" or "YYYY-MM-DD" string.
+ * The month inputs (progressive claims) give "YYYY-MM" while the SPA/VP
+ * date inputs give full "YYYY-MM-DD" — naively appending "-01" to the
+ * latter produced an Invalid Date.
+ */
+function monthStart(dateStr) {
+  return new Date(dateStr.slice(0, 7) + "-01");
+}
+
+/** Whole months between two date strings (end − start), month granularity. */
+function monthsBetween(start, end) {
+  const s = monthStart(start);
+  const e = monthStart(end);
   return (e.getFullYear() - s.getFullYear()) * 12 + (e.getMonth() - s.getMonth());
 }
 
@@ -93,7 +103,7 @@ export function amortizationSchedule(property) {
   let balance = loanAmount;
 
   const refStr = property.type === "under_construction" ? property.vpDate : property.spaDate;
-  let startDate = refStr ? new Date(refStr + "-01") : null;
+  let startDate = refStr ? monthStart(refStr) : null;
   if (startDate && property.type !== "under_construction") {
     // Completed/subsale: loan starts ~1 month after SPA
     startDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 1);

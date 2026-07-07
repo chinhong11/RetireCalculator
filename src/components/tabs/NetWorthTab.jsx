@@ -30,7 +30,9 @@ export default function NetWorthTab({ projectionData, yearsToProject }) {
   const [fdList,         setFdList]         = useState(() => readLS("fd_v1"));
 
   const readEpf = () => ({
-    wage:      parseFloat(localStorage.getItem("epf_wage")        || "0"),
+    // ?? not ||: default must match EPFTab's (5000) only when the key has
+    // never been written, or net worth jumps after first visiting that tab
+    wage:      parseFloat(localStorage.getItem("epf_wage")        ?? "5000"),
     age:       parseInt(localStorage.getItem("epf_age")           || "30"),
     increment: parseFloat(localStorage.getItem("epf_increment")   || "3"),
     dividend:  parseFloat(localStorage.getItem("epf_dividend")    || "5.5"),
@@ -137,7 +139,10 @@ export default function NetWorthTab({ projectionData, yearsToProject }) {
     { key: "myStk",    label: "MY Stocks (MYR)",        color: "#38bdf8", note: myStocksLive ? "live" : "cost basis" },
     { key: "usAssets", label: "US Stocks+Crypto (USD)", color: "#fbbf24", note: (stocksLive || cryptoLive) ? "live" : "cost basis" },
     { key: "fds",      label: "Fixed Deposits (MYR)",   color: "#34d399", note: "principal" },
-  ].filter(s => (today[s.key] || 0) > 0 || s.key === "cpf");
+    // Keep a series if it holds value in ANY projected year — filtering on
+    // today's value alone hid series (e.g. EPF growing from a 0 start) whose
+    // amounts were still counted in Total, so the visible columns didn't sum.
+  ].filter(s => s.key === "cpf" || chartData.some(row => (row[s.key] || 0) > 0));
 
   const gradId = k => `nwGrad_${k}`;
 

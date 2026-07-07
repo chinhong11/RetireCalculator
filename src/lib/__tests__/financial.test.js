@@ -12,7 +12,7 @@ import {
   getEpfRates, computeEpfMonthly, projectEpfYears,
 } from "../epf.js";
 
-import { calcInstallment, calcFd } from "../finance.js";
+import { calcInstallment, calcFd, fmtCoin } from "../finance.js";
 import { runMigrations, SCHEMA_KEY, CURRENT_VERSION } from "../migrations.js";
 
 // ─── CPF rate-table lookups ───────────────────────────────────────────────────
@@ -126,6 +126,39 @@ describe("computeMonthly", () => {
 });
 
 // ─── projectYears ─────────────────────────────────────────────────────────────
+
+describe("projectYears — MA overflow respects FRS cap after 55", () => {
+  it("routes MA-above-BHS excess to OA once RA is at the FRS (not into RA)", () => {
+    // Age 60, RA already at FRS, MA at BHS, 10% MA return with flat ceilings:
+    // all MA interest overflows, and with zero FRS headroom it must land in OA.
+    const rows = projectYears({
+      salary: 0, age: 60, prYear: 3, annualIncrement: 0, yearsToProject: 1,
+      oaReturn: 0, saReturn: 0, maReturn: 10,
+      oaStart: 0, saStart: CPF_FRS_2026, maStart: CPF_BHS_2026,
+      frsGrowthRate: 0, bhsGrowthRate: 0,
+    });
+    const r1 = rows[1];
+    const overflow = CPF_BHS_2026 * 0.10;
+    expect(r1.ma).toBeCloseTo(CPF_BHS_2026, 0);      // MA frozen at BHS
+    expect(r1.oa).toBeCloseTo(overflow, 0);          // excess lands in OA
+    // RA gains only the extra-interest credit (2% × 30k + 1% × 30k = 900),
+    // NOT the MA overflow — pre-fix it was FRS + overflow + 900
+    expect(r1.ra).toBeCloseTo(CPF_FRS_2026 + 900, 0);
+  });
+
+  it("before 55 the overflow still goes to SA (unchanged)", () => {
+    const rows = projectYears({
+      salary: 0, age: 40, prYear: 3, annualIncrement: 0, yearsToProject: 1,
+      oaReturn: 0, saReturn: 0, maReturn: 10,
+      oaStart: 0, saStart: 0, maStart: CPF_BHS_2026,
+      frsGrowthRate: 0, bhsGrowthRate: 0,
+    });
+    const r1 = rows[1];
+    expect(r1.ma).toBeCloseTo(CPF_BHS_2026, 0);
+    expect(r1.sa).toBeGreaterThanOrEqual(CPF_BHS_2026 * 0.10); // overflow + extra interest
+    expect(r1.oa).toBe(0);
+  });
+});
 
 describe("projectYears", () => {
   const base = { salary: 5000, age: 30, prYear: 3, annualIncrement: 0, yearsToProject: 2, oaReturn: 2.5, saReturn: 4, maReturn: 4 };
@@ -392,6 +425,35 @@ describe("calcFd", () => {
     const r = calcFd({ principal: "80000", rate: "3.5", tenureMonths: "9" });
     expect(r.maturityValue).toBeCloseTo(r.interest + 80000, 6);
   });
+
+  it("maturityDate is startDate advanced by the tenure in months", () => {
+    // Mar 2026 + 12 months = Mar 2027
+    const r = calcFd({ principal: "50000", rate: "3.85", tenureMonths: "12", startDate: "2026-03" });
+    expect(r.maturityDate).toMatch(/Mar 2027/);
+  });
+
+  it("maturityDate rolls over the year boundary correctly", () => {
+    // Oct 2026 + 6 months = Apr 2027
+    const r = calcFd({ principal: "50000", rate: "3.85", tenureMonths: "6", startDate: "2026-10" });
+    expect(r.maturityDate).toMatch(/Apr 2027/);
+  });
+
+  it("maturityDate is null when no startDate is given", () => {
+    expect(calcFd({ principal: "50000", rate: "3.85", tenureMonths: "12" }).maturityDate).toBeNull();
+  });
+});
+
+// ─── fmtCoin (crypto price formatting) ───────────────────────────────────────
+
+describe("fmtCoin", () => {
+  it("null → em dash", () => expect(fmtCoin(null)).toBe("—"));
+  it(">= 1000 uses thousands separators, ≤2 dp", () => expect(fmtCoin(65000)).toBe("$65,000"));
+  it("1..999 → 2 dp", () => expect(fmtCoin(12.5)).toBe("$12.50"));
+  it("0.01..1 → 4 dp", () => expect(fmtCoin(0.1234)).toBe("$0.1234"));
+  it("0.000001..0.01 → 6 dp", () => expect(fmtCoin(0.00005)).toBe("$0.000050"));
+  // Sub-micro prices fall through to toPrecision(4), which JS renders in
+  // scientific notation — a known cosmetic quirk for ultra-cheap tokens.
+  it("sub-micro → 4 significant figures (scientific notation)", () => expect(fmtCoin(0.00000001234)).toBe("$1.234e-8"));
 });
 
 // ─── FIRE number invariant ────────────────────────────────────────────────────
