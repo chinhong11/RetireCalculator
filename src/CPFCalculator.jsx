@@ -1,7 +1,6 @@
-import { useState, useMemo, useEffect, useCallback } from "react";
+import { useState, useMemo, useEffect, useCallback, lazy, Suspense } from "react";
 
 import { CPF_FRS_2026, CPF_BHS_2026, computeMonthly, projectYears, estimateCpfLifePayout, fmtD } from "./lib/cpf.js";
-import { exportCpfPdf } from "./lib/exportPdf.js";
 import { useCloudSync } from "./lib/useCloudSync.js";
 import { usePersistedState } from "./lib/usePersistedState.js";
 import { THEMES, GLOBAL_CSS } from "./theme.js";
@@ -14,18 +13,29 @@ import { ErrorBoundary }   from "./components/shared/ErrorBoundary.jsx";
 import { CpfSummaryCards } from "./components/shared/CpfSummaryCards.jsx";
 import { AuthModal }       from "./components/shared/AuthModal.jsx";
 
-import ProjectionTab      from "./components/tabs/ProjectionTab.jsx";
-import ProjectionTableTab from "./components/tabs/ProjectionTableTab.jsx";
-import HousingLoanTab     from "./components/tabs/HousingLoanTab.jsx";
-import StocksTab          from "./components/tabs/StocksTab.jsx";
-import CryptoTab          from "./components/tabs/CryptoTab.jsx";
-import MYStocksTab        from "./components/tabs/MYStocksTab.jsx";
-import EPFTab             from "./components/tabs/EPFTab.jsx";
-import FixedDepositsTab   from "./components/tabs/FixedDepositsTab.jsx";
-import SavingsTab         from "./components/tabs/SavingsTab.jsx";
-import FireTab            from "./components/tabs/FireTab.jsx";
-import NetWorthTab        from "./components/tabs/NetWorthTab.jsx";
-import SummaryTab         from "./components/tabs/SummaryTab.jsx";
+// Tabs are lazy so Recharts/heavy tab code loads on demand instead of
+// blocking first paint. (exportPdf — and jsPDF with it — is dynamically
+// imported inside handleExportPdf for the same reason.)
+const ProjectionTab      = lazy(() => import("./components/tabs/ProjectionTab.jsx"));
+const ProjectionTableTab = lazy(() => import("./components/tabs/ProjectionTableTab.jsx"));
+const HousingLoanTab     = lazy(() => import("./components/tabs/HousingLoanTab.jsx"));
+const StocksTab          = lazy(() => import("./components/tabs/StocksTab.jsx"));
+const CryptoTab          = lazy(() => import("./components/tabs/CryptoTab.jsx"));
+const MYStocksTab        = lazy(() => import("./components/tabs/MYStocksTab.jsx"));
+const EPFTab             = lazy(() => import("./components/tabs/EPFTab.jsx"));
+const FixedDepositsTab   = lazy(() => import("./components/tabs/FixedDepositsTab.jsx"));
+const SavingsTab         = lazy(() => import("./components/tabs/SavingsTab.jsx"));
+const FireTab            = lazy(() => import("./components/tabs/FireTab.jsx"));
+const NetWorthTab        = lazy(() => import("./components/tabs/NetWorthTab.jsx"));
+const SummaryTab         = lazy(() => import("./components/tabs/SummaryTab.jsx"));
+
+function TabLoading() {
+  return (
+    <div style={{ padding: "48px 0", textAlign: "center", color: "var(--muted)", fontSize: 13 }}>
+      Loading…
+    </div>
+  );
+}
 
 export default function CPFCalculator() {
   // ─── Theme ──────────────────────────────────────────────────────────────
@@ -102,6 +112,7 @@ export default function CPFCalculator() {
     setPdfBusy(true);
     setPdfError(null);
     try {
+      const { exportCpfPdf } = await import("./lib/exportPdf.js");
       await exportCpfPdf({
         projectionData, salary, age, prYear, annualIncrement, yearsToProject,
         oaReturn, saReturn, maReturn, ceilingGrowth,
@@ -214,6 +225,7 @@ export default function CPFCalculator() {
           </div>{/* end sticky nav wrapper */}
 
           {/* ── Tab content ───────────────────────────────────────────────── */}
+          <Suspense fallback={<TabLoading />}>
           {activeTab === "summary" && (
             <div role="tabpanel" id="tabpanel-summary" aria-labelledby="tab-summary" style={{ marginBottom: 28 }}>
               <ErrorBoundary key="summary">
@@ -256,6 +268,7 @@ export default function CPFCalculator() {
           {activeTab === "savings"  && <div role="tabpanel" id="tabpanel-savings"  aria-labelledby="tab-savings"  style={{ marginBottom: 28 }}><ErrorBoundary key="savings"><SavingsTab projectionData={projectionData} yearsToProject={yearsToProject} cpfMonthly={monthly} salary={salary} /></ErrorBoundary></div>}
           {activeTab === "fire"     && <div role="tabpanel" id="tabpanel-fire"     aria-labelledby="tab-fire"     style={{ marginBottom: 28 }}><ErrorBoundary key="fire"><FireTab projectionData={projectionData} yearsToProject={yearsToProject} /></ErrorBoundary></div>}
           {activeTab === "networth" && <div role="tabpanel" id="tabpanel-networth" aria-labelledby="tab-networth" style={{ marginBottom: 28 }}><ErrorBoundary key="networth"><NetWorthTab projectionData={projectionData} yearsToProject={yearsToProject} /></ErrorBoundary></div>}
+          </Suspense>
 
           {/* ── Summary cards ─────────────────────────────────────────────── */}
           <CpfSummaryCards
