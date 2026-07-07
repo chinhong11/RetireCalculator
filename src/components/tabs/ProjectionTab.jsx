@@ -1,6 +1,7 @@
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { CPF_FRS_2026, CPF_BHS_2026, fmtD } from "../../lib/cpf.js";
 import { CustomTooltip } from "../shared/CustomTooltip.jsx";
+import { SEM } from "../../theme.js";
 
 /**
  * @param {{
@@ -32,10 +33,10 @@ export default function ProjectionTab({
         </div>
         <div style={{ display: "flex", flexWrap: "wrap", gap: 12, fontSize: 12 }}>
           {[
-            { color: "#4ade80", label: "OA" },
-            { color: "#818cf8", label: "SA" },
-            { color: "#a78bfa", label: "RA", note: "(at 55)" },
-            { color: "#f472b6", label: "MA" },
+            { color: SEM.oa, label: "OA" },
+            { color: SEM.sa, label: "SA" },
+            { color: SEM.ra, label: "RA", note: "(at 55)" },
+            { color: SEM.ma, label: "MA" },
           ].map(({ color, label, note }) => (
             <span key={label} style={{ display: "flex", alignItems: "center", gap: 6 }}>
               <span style={{ width: 10, height: 10, borderRadius: 3, background: color, display: "inline-block" }} />
@@ -50,10 +51,10 @@ export default function ProjectionTab({
         <AreaChart data={projectionData} margin={{ top: 5, right: 10, left: 0, bottom: 5 }}>
           <defs>
             {[
-              { id: "gOA", color: "#4ade80" },
-              { id: "gSA", color: "#818cf8" },
-              { id: "gRA", color: "#a78bfa" },
-              { id: "gMA", color: "#f472b6" },
+              { id: "gOA", color: SEM.oa },
+              { id: "gSA", color: SEM.sa },
+              { id: "gRA", color: SEM.ra },
+              { id: "gMA", color: SEM.ma },
             ].map(({ id, color }) => (
               <linearGradient key={id} id={id} x1="0" y1="0" x2="0" y2="1">
                 <stop offset="0%"   stopColor={color} stopOpacity={0.4} />
@@ -69,10 +70,10 @@ export default function ProjectionTab({
             width={55}
           />
           <Tooltip content={<CustomTooltip />} />
-          <Area type="monotone" dataKey="oa" stackId="1" stroke="#4ade80" fill="url(#gOA)" strokeWidth={2} />
-          <Area type="monotone" dataKey="sa" stackId="1" stroke="#818cf8" fill="url(#gSA)" strokeWidth={2} />
-          <Area type="monotone" dataKey="ra" stackId="1" stroke="#a78bfa" fill="url(#gRA)" strokeWidth={2} />
-          <Area type="monotone" dataKey="ma" stackId="1" stroke="#f472b6" fill="url(#gMA)" strokeWidth={2} />
+          <Area type="monotone" dataKey="oa" stackId="1" stroke={SEM.oa} fill="url(#gOA)" strokeWidth={2} />
+          <Area type="monotone" dataKey="sa" stackId="1" stroke={SEM.sa} fill="url(#gSA)" strokeWidth={2} />
+          <Area type="monotone" dataKey="ra" stackId="1" stroke={SEM.ra} fill="url(#gRA)" strokeWidth={2} />
+          <Area type="monotone" dataKey="ma" stackId="1" stroke={SEM.ma} fill="url(#gMA)" strokeWidth={2} />
         </AreaChart>
       </ResponsiveContainer>
 
@@ -83,7 +84,7 @@ export default function ProjectionTab({
           : fmtD(CPF_FRS_2026);
         return (
           <div style={{ marginTop: 14, padding: "10px 14px", borderRadius: 8, background: "rgba(167,139,250,0.06)", border: "1px solid rgba(167,139,250,0.2)", fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
-            <span style={{ color: "#a78bfa", fontWeight: 600 }}>RA formed at age 55</span>
+            <span style={{ color: SEM.ra, fontWeight: 600 }}>RA formed at age 55</span>
             {" "}— SA transferred to Retirement Account; OA topped up to projected FRS of {effectiveFrs} ({ceilingGrowth}%/yr growth from {fmtD(CPF_FRS_2026)}). Future SA-allocation contributions go to RA.
           </div>
         );
@@ -91,7 +92,7 @@ export default function ProjectionTab({
 
       {projectionData.some(d => d.ma >= d.bhs) && (
         <div style={{ marginTop: 10, padding: "10px 14px", borderRadius: 8, background: "rgba(244,114,182,0.05)", border: "1px solid rgba(244,114,182,0.15)", fontSize: 12, color: "var(--muted)", lineHeight: 1.6 }}>
-          <span style={{ color: "#f472b6", fontWeight: 600 }}>MA reaches BHS cap</span>
+          <span style={{ color: SEM.ma, fontWeight: 600 }}>MA reaches BHS cap</span>
           {" "}— excess contributions and interest redirect to SA / RA. BHS starts at {fmtD(CPF_BHS_2026)} and grows at {ceilingGrowth}%/yr in this projection.
         </div>
       )}

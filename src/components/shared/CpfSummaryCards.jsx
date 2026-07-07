@@ -1,5 +1,6 @@
 import { fmtD } from "../../lib/cpf.js";
 import { StatCard } from "./StatCard.jsx";
+import { SEM } from "../../theme.js";
 
 /**
  * @param {{
@@ -17,17 +18,17 @@ export function CpfSummaryCards({ finalData, yearsToProject, oaReturn, saReturn,
       <StatCard
         label={`OA Balance (Yr ${yearsToProject})`}
         value={fmtD(finalData.oa)}
-        color="#4ade80"
+        color={SEM.oa}
         sub={`at ${oaReturn}% return`}
       />
       {finalData.raFormed
-        ? <StatCard label={`RA Balance (Yr ${yearsToProject})`} value={fmtD(finalData.ra)} color="#a78bfa" sub={`at ${saReturn}% return`} />
-        : <StatCard label={`SA Balance (Yr ${yearsToProject})`} value={fmtD(finalData.sa)} color="#818cf8" sub={`at ${saReturn}% return`} />
+        ? <StatCard label={`RA Balance (Yr ${yearsToProject})`} value={fmtD(finalData.ra)} color={SEM.ra} sub={`at ${saReturn}% return`} />
+        : <StatCard label={`SA Balance (Yr ${yearsToProject})`} value={fmtD(finalData.sa)} color={SEM.sa} sub={`at ${saReturn}% return`} />
       }
       <StatCard
         label={`MA Balance (Yr ${yearsToProject})`}
         value={fmtD(finalData.ma)}
-        color="#f472b6"
+        color={SEM.ma}
         sub={finalData.ma >= finalData.bhs ? `BHS cap: ${fmtD(finalData.bhs)}` : `at ${maReturn}% return`}
       />
       {cpfLifePayout && (

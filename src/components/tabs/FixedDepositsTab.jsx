@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { calcFd, FD_EMPTY } from "../../lib/finance.js";
 import { downloadBlob, toCsv } from "../../lib/backup.js";
 import { usePersistedState } from "../../lib/usePersistedState.js";
+import { SEM } from "../../theme.js";
 
 export default function FixedDepositsTab() {
   const [deposits, setDeposits] = usePersistedState("fd_v1", [], "jsonArray");
@@ -43,7 +44,7 @@ export default function FixedDepositsTab() {
     padding: "6px 10px", color: "var(--text)", fontSize: 13, width: "100%",
   };
   const cardStyle = { borderRadius: 12, padding: "14px 18px", background: "var(--hover-bg)", border: "1px solid var(--border)" };
-  const FD_COLOR = "#34d399";
+  const FD_COLOR = SEM.success;
   const INT_COLOR = "#f59e0b";
 
   const exportCsv = () => {
@@ -76,7 +77,7 @@ export default function FixedDepositsTab() {
             { label: "Total Principal", value: totals.principal, color: FD_COLOR },
             { label: "Total Interest", value: totals.interest, color: INT_COLOR },
             { label: "Total at Maturity", value: totals.maturity, color: "#fff" },
-            { label: "Avg Rate", value: null, extra: deposits.length > 0 ? (deposits.reduce((s, fd) => s + (parseFloat(fd.rate) || 0), 0) / deposits.length).toFixed(2) + "% p.a." : "—", color: "#818cf8" },
+            { label: "Avg Rate", value: null, extra: deposits.length > 0 ? (deposits.reduce((s, fd) => s + (parseFloat(fd.rate) || 0), 0) / deposits.length).toFixed(2) + "% p.a." : "—", color: SEM.sa },
           ].map(({ label, value, extra, color }) => (
             <div key={label} style={{ ...cardStyle, textAlign: "center" }}>
               <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 6 }}>{label}</div>

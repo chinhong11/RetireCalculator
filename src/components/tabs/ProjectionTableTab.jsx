@@ -1,4 +1,5 @@
 import { fmtD } from "../../lib/cpf.js";
+import { SEM } from "../../theme.js";
 
 /**
  * @param {{
@@ -38,7 +39,7 @@ export default function ProjectionTableTab({ projectionData, effectiveSaShield, 
                   <td style={{ padding: "12px", textAlign: "right", fontWeight: 600 }}>
                     {d.year}
                     {isRaYear && (
-                      <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: "#a78bfa", background: "rgba(167,139,250,0.15)", padding: "2px 5px", borderRadius: 4, verticalAlign: "middle" }}>
+                      <span style={{ marginLeft: 6, fontSize: 9, fontWeight: 700, color: SEM.ra, background: "rgba(167,139,250,0.15)", padding: "2px 5px", borderRadius: 4, verticalAlign: "middle" }}>
                         RA
                       </span>
                     )}
@@ -47,16 +48,16 @@ export default function ProjectionTableTab({ projectionData, effectiveSaShield, 
                   <td style={{ padding: "12px", textAlign: "right", color: "var(--label)" }}>{d.prYear >= 3 ? "3+" : d.prYear}</td>
                   <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace" }}>{fmtD(d.salary)}</td>
                   <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace" }}>{fmtD(d.monthlyContrib)}</td>
-                  <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: "#4ade80" }}>{fmtD(d.oa)}</td>
-                  <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: "#818cf8" }}>
+                  <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: SEM.oa }}>{fmtD(d.oa)}</td>
+                  <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: SEM.sa }}>
                     {d.raFormed ? <span style={{ color: "var(--muted)" }}>—</span> : fmtD(d.sa)}
                   </td>
-                  <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: "#a78bfa" }}>
+                  <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: SEM.ra }}>
                     {d.raFormed ? fmtD(d.ra) : <span style={{ color: "var(--muted)" }}>—</span>}
                   </td>
-                  <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: "#f472b6" }}>{fmtD(d.ma)}</td>
+                  <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: SEM.ma }}>{fmtD(d.ma)}</td>
                   {showCpfis && (
-                    <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: "#818cf8" }}>
+                    <td style={{ padding: "12px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: SEM.sa }}>
                       {d.cpfis > 0 ? fmtD(d.cpfis) : <span style={{ color: "var(--muted)" }}>—</span>}
                     </td>
                   )}

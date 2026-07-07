@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { supabase } from "../../lib/supabase.js";
+import { SEM } from "../../theme.js";
 
 /**
  * @param {{ onClose: () => void }} props
@@ -158,7 +159,7 @@ export function AuthModal({ onClose }) {
           </div>
 
           {error && (
-            <div style={{ fontSize: 12, color: "#f87171", marginBottom: 14, padding: "8px 12px", borderRadius: 8, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
+            <div style={{ fontSize: 12, color: SEM.danger, marginBottom: 14, padding: "8px 12px", borderRadius: 8, background: "rgba(239,68,68,0.08)", border: "1px solid rgba(239,68,68,0.2)" }}>
               {error}
             </div>
           )}

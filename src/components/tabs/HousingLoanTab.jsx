@@ -4,6 +4,7 @@ import { loanSummary, progressiveTimeline as buildProgressiveTimeline, amortizat
 import { toCsv, downloadBlob, printTable } from "../../lib/backup.js";
 import { StatCard } from "../shared/StatCard.jsx";
 import { LabelField } from "../shared/LabelField.jsx";
+import { SEM } from "../../theme.js";
 
 const safeFloat = (val, max = 1e9) => { const n = parseFloat(val); return isFinite(n) ? Math.min(Math.max(0, n), max) : 0; };
 const safeInt   = (val, max = 1e6) => { const n = parseInt(val, 10); return isFinite(n) ? Math.min(Math.max(0, n), max) : 0; };
@@ -210,7 +211,7 @@ export default function HousingLoanTab() {
       <div style={{ background: "var(--card-bg)", borderRadius: 16, padding: 24, border: "1px solid var(--border)", marginBottom: 20 }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 18 }}>
           <div className="section-title" style={{ margin: 0 }}>Property Details</div>
-          <button onClick={delProp} style={{ padding: "5px 14px", borderRadius: 8, background: "rgba(248,113,113,0.1)", color: "#f87171", border: "1px solid rgba(248,113,113,0.2)", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>
+          <button onClick={delProp} style={{ padding: "5px 14px", borderRadius: 8, background: "rgba(248,113,113,0.1)", color: SEM.danger, border: "1px solid rgba(248,113,113,0.2)", cursor: "pointer", fontSize: 12, fontWeight: 600, fontFamily: "inherit" }}>
             Delete Property
           </button>
         </div>
@@ -250,7 +251,7 @@ export default function HousingLoanTab() {
 
       {/* Over-downpayment warning */}
       {prop.purchasePrice > 0 && totalDownpaid > prop.purchasePrice && (
-        <div style={{ marginBottom: 16, padding: "10px 16px", borderRadius: 10, background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.3)", fontSize: 12, color: "#fbbf24", lineHeight: 1.6 }}>
+        <div style={{ marginBottom: 16, padding: "10px 16px", borderRadius: 10, background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.3)", fontSize: 12, color: SEM.warn, lineHeight: 1.6 }}>
           ⚠ Total downpayments ({RM(totalDownpaid)}) exceed the purchase price ({RM(prop.purchasePrice)}). Loan amount is shown as RM 0. Check your records for duplicate or incorrect entries.
         </div>
       )}
@@ -260,9 +261,9 @@ export default function HousingLoanTab() {
         <StatCard label="Purchase Price" value={RM(prop.purchasePrice)} color="#e8eaf0" />
         <StatCard label="Downpayment Paid" value={RM(totalDownpaid)} sub={prop.purchasePrice > 0 ? `${((totalDownpaid / prop.purchasePrice) * 100).toFixed(1)}% of price` : "—"} color="var(--accent)" />
         <StatCard label="Loan Amount" value={RM(loanAmount)} sub={prop.purchasePrice > 0 ? `${((loanAmount / prop.purchasePrice) * 100).toFixed(1)}% financing` : "—"} color="var(--accent2)" />
-        <StatCard label="Monthly Installment" value={RM2(monthlyInstallment)} sub={`${prop.tenure}yr @ ${prop.interestRate}% p.a.`} color="#f472b6" />
-        <StatCard label="Total Payable" value={RM(totalPayable)} sub="Over full tenure" color="#fbbf24" />
-        <StatCard label="Total Interest" value={RM(totalInterest)} sub={loanAmount > 0 ? `${((totalInterest / loanAmount) * 100).toFixed(1)}% of loan` : "—"} color="#f87171" />
+        <StatCard label="Monthly Installment" value={RM2(monthlyInstallment)} sub={`${prop.tenure}yr @ ${prop.interestRate}% p.a.`} color={SEM.ma} />
+        <StatCard label="Total Payable" value={RM(totalPayable)} sub="Over full tenure" color={SEM.warn} />
+        <StatCard label="Total Interest" value={RM(totalInterest)} sub={loanAmount > 0 ? `${((totalInterest / loanAmount) * 100).toFixed(1)}% of loan` : "—"} color={SEM.danger} />
       </div>
 
       {/* Amortization Schedule */}
@@ -296,8 +297,8 @@ export default function HousingLoanTab() {
               <div style={{ display: "flex", gap: 12, padding: "0 24px 20px", flexWrap: "wrap" }}>
                 {[
                   { label: "Total Principal", val: RM(amortTotalPrincipal), color: "var(--accent)" },
-                  { label: "Total Interest", val: RM(amortTotalInterest), color: "#f87171" },
-                  { label: "Interest / Loan", val: loanAmount > 0 ? `${((amortTotalInterest / loanAmount) * 100).toFixed(1)}%` : "—", color: "#fbbf24" },
+                  { label: "Total Interest", val: RM(amortTotalInterest), color: SEM.danger },
+                  { label: "Interest / Loan", val: loanAmount > 0 ? `${((amortTotalInterest / loanAmount) * 100).toFixed(1)}%` : "—", color: SEM.warn },
                   { label: "Total Cost", val: RM(amortTotalPrincipal + amortTotalInterest), color: "#e8eaf0" },
                 ].map(({ label, val, color }) => (
                   <div key={label} style={{ flex: "1 1 120px", padding: "12px 16px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)" }}>
@@ -350,7 +351,7 @@ export default function HousingLoanTab() {
                         {amortHasDate && <td style={{ padding: "9px 14px", color: "var(--label)", whiteSpace: "nowrap", fontSize: 12 }}>{r.date}</td>}
                         <td style={{ padding: "9px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: "var(--label)" }}>{RM2(r.opening)}</td>
                         <td style={{ padding: "9px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 600, color: "var(--accent)" }}>{RM2(r.principal)}</td>
-                        <td style={{ padding: "9px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: "#f87171" }}>{RM2(r.interest)}</td>
+                        <td style={{ padding: "9px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", color: SEM.danger }}>{RM2(r.interest)}</td>
                         <td style={{ padding: "9px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 600 }}>{RM2(r.closing)}</td>
                       </tr>
                     ))}
@@ -359,7 +360,7 @@ export default function HousingLoanTab() {
                     <tr style={{ borderTop: "2px solid var(--border)", background: "rgba(255,255,255,0.02)" }}>
                       <td colSpan={amortHasDate ? 3 : 2} style={{ padding: "10px 14px", fontWeight: 700, color: "var(--label)", fontSize: 12 }}>Year {amortYear} Totals</td>
                       <td style={{ padding: "10px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 800, color: "var(--accent)" }}>{RM2(amortYearPrincipal)}</td>
-                      <td style={{ padding: "10px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 800, color: "#f87171" }}>{RM2(amortYearInterest)}</td>
+                      <td style={{ padding: "10px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 800, color: SEM.danger }}>{RM2(amortYearInterest)}</td>
                       <td />
                     </tr>
                   </tfoot>
@@ -388,7 +389,7 @@ export default function HousingLoanTab() {
           </div>
           <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 4 }}>
             <button onClick={addDP} style={addBtnStyle}>+ Add</button>
-            {dpError && <span style={{ fontSize: 11, color: "#f87171", whiteSpace: "nowrap" }}>⚠ {dpError}</span>}
+            {dpError && <span style={{ fontSize: 11, color: SEM.danger, whiteSpace: "nowrap" }}>⚠ {dpError}</span>}
           </div>
         </div>
         {(prop.downpaymentRecords || []).length > 0 ? (
@@ -413,7 +414,7 @@ export default function HousingLoanTab() {
                         <td style={{ padding: "10px 12px", color: "var(--text)" }}>{r.note || "—"}</td>
                         <td style={{ padding: "10px 12px", fontFamily: "'DM Mono', monospace", color: "var(--label)" }}>{RM(running)}</td>
                         <td style={{ padding: "10px 12px" }}>
-                          <button onClick={() => delDP(r.id)} style={{ color: "#f87171", background: "none", border: "none", cursor: "pointer", fontSize: 14, padding: "2px 8px" }}>✕</button>
+                          <button onClick={() => delDP(r.id)} style={{ color: SEM.danger, background: "none", border: "none", cursor: "pointer", fontSize: 14, padding: "2px 8px" }}>✕</button>
                         </td>
                       </tr>
                     );
@@ -461,7 +462,7 @@ export default function HousingLoanTab() {
             </div>
             <div style={{ display: "flex", flexDirection: "column", justifyContent: "flex-end", gap: 4 }}>
               <button onClick={addPR} style={addBtnStyle}>+ Add</button>
-              {prError && <span style={{ fontSize: 11, color: "#f87171", whiteSpace: "nowrap" }}>⚠ {prError}</span>}
+              {prError && <span style={{ fontSize: 11, color: SEM.danger, whiteSpace: "nowrap" }}>⚠ {prError}</span>}
             </div>
           </div>
           {progressiveTimeline.length > 0 ? (
@@ -479,14 +480,14 @@ export default function HousingLoanTab() {
                     <tr key={r.id} style={{ borderBottom: "1px solid var(--border)", background: i % 2 ? "rgba(255,255,255,0.01)" : "transparent" }}>
                       <td style={{ padding: "10px 12px", color: "var(--label)", whiteSpace: "nowrap" }}>{r.month}</td>
                       <td style={{ padding: "10px 12px", color: "var(--text)" }}>{r.stage || "—"}</td>
-                      <td style={{ padding: "10px 12px", fontFamily: "'DM Mono', monospace", fontWeight: 600, color: "#818cf8" }}>{RM(r.claimAmount)}</td>
+                      <td style={{ padding: "10px 12px", fontFamily: "'DM Mono', monospace", fontWeight: 600, color: SEM.sa }}>{RM(r.claimAmount)}</td>
                       <td style={{ padding: "10px 12px", fontFamily: "'DM Mono', monospace", color: "var(--accent2)" }}>{RM(r.cumulative)}</td>
-                      <td style={{ padding: "10px 12px", fontFamily: "'DM Mono', monospace", fontWeight: 700, color: "#f472b6" }}>{RM2(r.monthlyInterest)}</td>
+                      <td style={{ padding: "10px 12px", fontFamily: "'DM Mono', monospace", fontWeight: 700, color: SEM.ma }}>{RM2(r.monthlyInterest)}</td>
                       <td style={{ padding: "10px 12px", fontFamily: "'DM Mono', monospace", color: "var(--muted)", textAlign: "center" }}>{r.stageDuration ?? "—"}</td>
-                      <td style={{ padding: "10px 12px", fontFamily: "'DM Mono', monospace", fontWeight: 700, color: "#f472b6" }}>{RM2(r.stageInterestTotal)}</td>
+                      <td style={{ padding: "10px 12px", fontFamily: "'DM Mono', monospace", fontWeight: 700, color: SEM.ma }}>{RM2(r.stageInterestTotal)}</td>
                       <td style={{ padding: "10px 12px", color: "var(--muted)", fontSize: 12 }}>{r.note || "—"}</td>
                       <td style={{ padding: "10px 12px" }}>
-                        <button onClick={() => delPR(r.id)} style={{ color: "#f87171", background: "none", border: "none", cursor: "pointer", fontSize: 14, padding: "2px 8px" }}>✕</button>
+                        <button onClick={() => delPR(r.id)} style={{ color: SEM.danger, background: "none", border: "none", cursor: "pointer", fontSize: 14, padding: "2px 8px" }}>✕</button>
                       </td>
                     </tr>
                   ))}
@@ -494,7 +495,7 @@ export default function HousingLoanTab() {
                 <tfoot>
                   <tr style={{ borderTop: "2px solid var(--border)" }}>
                     <td colSpan={6} style={{ padding: "12px", fontWeight: 700, color: "var(--label)" }}>Est. Total Interest During Construction</td>
-                    <td style={{ padding: "12px", fontFamily: "'DM Mono', monospace", fontWeight: 800, color: "#f472b6", fontSize: 15 }}>{RM2(totalProgInterest)}</td>
+                    <td style={{ padding: "12px", fontFamily: "'DM Mono', monospace", fontWeight: 800, color: SEM.ma, fontSize: 15 }}>{RM2(totalProgInterest)}</td>
                     <td colSpan={2} />
                   </tr>
                 </tfoot>

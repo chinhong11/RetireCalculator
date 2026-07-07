@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { RM, USD, uid } from "../../lib/finance.js";
 import { totalDownpayment } from "../../lib/housing.js";
 import { usePersistedState } from "../../lib/usePersistedState.js";
+import { SEM } from "../../theme.js";
 
 function lsJson(key) {
   try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : []; } catch { return []; }
@@ -115,9 +116,9 @@ export default function SummaryTab({ cpfData, yearsToProject, projectionData }) 
         />
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {[
-            { label: "Ordinary Account (OA)", value: cpfOA, color: "#4ade80" },
-            { label: "Special Account (SA)",  value: cpfSA, color: "#818cf8" },
-            { label: "MediSave Account (MA)", value: cpfMA, color: "#f472b6" },
+            { label: "Ordinary Account (OA)", value: cpfOA, color: SEM.oa },
+            { label: "Special Account (SA)",  value: cpfSA, color: SEM.sa },
+            { label: "MediSave Account (MA)", value: cpfMA, color: SEM.ma },
           ].map(({ label, value, color }) => (
             <div key={label}>
               <div style={{ display: "flex", justifyContent: "space-between", fontSize: 13, marginBottom: 5 }}>
@@ -147,7 +148,7 @@ export default function SummaryTab({ cpfData, yearsToProject, projectionData }) 
           {[
             { label: "Total Property Value", value: RM(totalPropValue),   color: "#e8eaf0" },
             { label: "Equity Paid",          value: RM(totalEquity),      color: "var(--accent)" },
-            { label: "Outstanding Loan",     value: RM(totalOutstanding), color: "#f87171" },
+            { label: "Outstanding Loan",     value: RM(totalOutstanding), color: SEM.danger },
           ].map(({ label, value, color }) => (
             <div key={label} style={{ flex: "1 1 160px", background: "rgba(255,255,255,0.03)", borderRadius: 10, padding: "12px 14px", border: "1px solid var(--border)" }}>
               <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4, textTransform: "uppercase", letterSpacing: "0.06em", fontWeight: 600 }}>{label}</div>
@@ -179,7 +180,7 @@ export default function SummaryTab({ cpfData, yearsToProject, projectionData }) 
                   {[
                     { label: "Purchase",    value: RM(p.purchasePrice), color: "var(--text)" },
                     { label: "Equity Paid", value: RM(p.downpaid),      color: "var(--accent)" },
-                    { label: "Outstanding", value: RM(p.outstanding),   color: "#f87171" },
+                    { label: "Outstanding", value: RM(p.outstanding),   color: SEM.danger },
                   ].map(({ label, value, color }) => (
                     <div key={label} style={{ textAlign: "right" }}>
                       <div style={{ fontSize: 11, color: "var(--muted)" }}>{label}</div>
@@ -222,13 +223,13 @@ export default function SummaryTab({ cpfData, yearsToProject, projectionData }) 
           </div>
           <div style={{ flex: "1 1 200px", background: "rgba(251,191,36,0.06)", borderRadius: 12, padding: "16px 18px", border: "1px solid rgba(251,191,36,0.15)" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-              <span style={{ fontSize: 13, fontWeight: 600, color: "#fbbf24" }}>🪙 Crypto</span>
+              <span style={{ fontSize: 13, fontWeight: 600, color: SEM.warn }}>🪙 Crypto</span>
               <span style={{ fontSize: 11, color: "var(--muted)" }}>{cryptoHoldings.length} position{cryptoHoldings.length !== 1 ? "s" : ""}</span>
             </div>
-            <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 800, fontSize: 22, color: "#fbbf24", marginBottom: 6 }}>{USD(cryptoCost)}</div>
+            <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 800, fontSize: 22, color: SEM.warn, marginBottom: 6 }}>{USD(cryptoCost)}</div>
             {totalUSD > 0 && (
               <>
-                <MiniBar pct={(cryptoCost / totalUSD) * 100} color="#fbbf24" />
+                <MiniBar pct={(cryptoCost / totalUSD) * 100} color={SEM.warn} />
                 <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 5, textAlign: "right" }}>{((cryptoCost / totalUSD) * 100).toFixed(1)}% of investments</div>
               </>
             )}
@@ -313,7 +314,7 @@ export default function SummaryTab({ cpfData, yearsToProject, projectionData }) 
               const achieved  = current >= g.target;
               const fmtFn     = fmtByCurrency[g.currency] || (n => n.toLocaleString());
               const projAge   = g.currency === "SGD" ? cpfAgeForTarget(g.target) : null;
-              const barColor  = achieved ? "#34d399" : pct > 60 ? "var(--accent)" : pct > 30 ? "#fbbf24" : "#f87171";
+              const barColor  = achieved ? SEM.success : pct > 60 ? "var(--accent)" : pct > 30 ? SEM.warn : SEM.danger;
 
               return (
                 <div key={g.id} style={{ background: "rgba(255,255,255,0.03)", borderRadius: 12, padding: "18px 20px", border: `1px solid ${achieved ? "rgba(52,211,153,0.25)" : "var(--border)"}`, position: "relative" }}>
@@ -343,11 +344,11 @@ export default function SummaryTab({ cpfData, yearsToProject, projectionData }) 
                       <span style={{ fontSize: 11, color: "var(--muted)", marginLeft: 4 }}>({pct.toFixed(1)}%)</span>
                     </div>
                     {achieved ? (
-                      <span style={{ fontSize: 12, fontWeight: 700, color: "#34d399", background: "rgba(52,211,153,0.1)", borderRadius: 6, padding: "3px 10px" }}>✓ Goal reached!</span>
+                      <span style={{ fontSize: 12, fontWeight: 700, color: SEM.success, background: "rgba(52,211,153,0.1)", borderRadius: 6, padding: "3px 10px" }}>✓ Goal reached!</span>
                     ) : (
                       <div style={{ textAlign: "right" }}>
                         <span style={{ fontSize: 12, color: "var(--muted)" }}>Still needed: </span>
-                        <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "'DM Mono', monospace", color: "#f87171" }}>{fmtFn(remaining)}</span>
+                        <span style={{ fontSize: 13, fontWeight: 700, fontFamily: "'DM Mono', monospace", color: SEM.danger }}>{fmtFn(remaining)}</span>
                       </div>
                     )}
                   </div>

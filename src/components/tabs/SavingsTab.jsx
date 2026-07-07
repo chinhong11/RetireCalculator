@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { EXPENSE_CATS, EXPENSE_CAT_COLORS } from "../../lib/finance.js";
 import { usePersistedState } from "../../lib/usePersistedState.js";
+import { SEM } from "../../theme.js";
 
 export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly, salary }) {
   const [takeHome, setTakeHome]       = usePersistedState("sav_income",      0);
@@ -33,7 +34,7 @@ export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly,
   const monthlySavings = totalIncome - totalExpenses;
   const savingsRate    = totalIncome > 0 ? (monthlySavings / totalIncome) * 100 : 0;
   const annualSavings  = monthlySavings * 12;
-  const rateColor      = savingsRate >= 20 ? "#6ee7b7" : savingsRate >= 10 ? "#fbbf24" : "#f87171";
+  const rateColor      = savingsRate >= 20 ? "#6ee7b7" : savingsRate >= 10 ? SEM.warn : SEM.danger;
 
   const handleSave = () => {
     if (!form.category || !form.amount) return;
@@ -87,8 +88,8 @@ export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly,
           <div style={{ display: "flex", gap: 20, flexWrap: "wrap" }}>
             {[
               { label: "OA",             val: cpfMonthly.oaAmount,       color: "#6ee7b7" },
-              { label: "SA",             val: cpfMonthly.saAmount,        color: "#818cf8" },
-              { label: "MA",             val: cpfMonthly.maAmount,        color: "#f472b6" },
+              { label: "SA",             val: cpfMonthly.saAmount,        color: SEM.sa },
+              { label: "MA",             val: cpfMonthly.maAmount,        color: SEM.ma },
               { label: "Employee total", val: cpfMonthly.employeeContrib, color: "var(--text)" },
               { label: "Employer total", val: cpfMonthly.employerContrib, color: "var(--muted)" },
             ].map(({ label, val, color }) => (
@@ -175,7 +176,7 @@ export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly,
                   <span style={{ fontSize: 13, fontWeight: 600 }}>{e.category}</span>
                   {e.note && <span style={{ fontSize: 11, color: "var(--muted)", marginLeft: 8, fontStyle: "italic" }}>{e.note}</span>}
                 </div>
-                <div style={{ fontSize: 13, fontFamily: "'DM Mono', monospace", fontWeight: 600, color: "#f87171" }}>
+                <div style={{ fontSize: 13, fontFamily: "'DM Mono', monospace", fontWeight: 600, color: SEM.danger }}>
                   −{fmtSGD(parseFloat(e.amount) || 0)}
                 </div>
                 <button onClick={() => handleEdit(e)} style={{ background: "rgba(255,255,255,0.06)", color: "var(--muted)", border: "1px solid var(--border)", borderRadius: 6, padding: "3px 8px", fontSize: 11, cursor: "pointer" }}>✎</button>
@@ -184,7 +185,7 @@ export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly,
             ))}
             <div style={{ display: "flex", justifyContent: "flex-end", paddingTop: 4 }}>
               <span style={{ fontSize: 12, color: "var(--muted)" }}>Total: </span>
-              <span style={{ fontSize: 12, fontWeight: 700, color: "#f87171", marginLeft: 6, fontFamily: "'DM Mono', monospace" }}>{fmtSGD(totalExpenses)}</span>
+              <span style={{ fontSize: 12, fontWeight: 700, color: SEM.danger, marginLeft: 6, fontFamily: "'DM Mono', monospace" }}>{fmtSGD(totalExpenses)}</span>
             </div>
           </div>
         )}
@@ -208,7 +209,7 @@ export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly,
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
           {[
             { label: "Monthly Income",   value: totalIncome,    color: "#6ee7b7" },
-            { label: "Monthly Expenses", value: totalExpenses,  color: "#f87171" },
+            { label: "Monthly Expenses", value: totalExpenses,  color: SEM.danger },
             { label: "Monthly Savings",  value: monthlySavings, color: rateColor },
             { label: "Annual Savings",   value: annualSavings,  color: rateColor },
           ].map(({ label, value, color }) => (
@@ -223,7 +224,7 @@ export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly,
           <div style={cardStyle}>
             <div style={{ fontSize: 12, color: "var(--label)", fontWeight: 600, marginBottom: 10 }}>Income Allocation</div>
             <div style={{ display: "flex", height: 26, borderRadius: 8, overflow: "hidden", gap: 2 }}>
-              <div style={{ flex: Math.max(0, totalExpenses), background: "#f87171", display: "flex", alignItems: "center", justifyContent: "center" }}>
+              <div style={{ flex: Math.max(0, totalExpenses), background: SEM.danger, display: "flex", alignItems: "center", justifyContent: "center" }}>
                 {totalExpenses / totalIncome > 0.12 && (
                   <span style={{ fontSize: 11, color: "#fff", fontWeight: 700 }}>{((totalExpenses / totalIncome) * 100).toFixed(0)}% expenses</span>
                 )}
@@ -314,7 +315,7 @@ export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly,
                 if (monthlySavings <= 0) {
                   return (
                     <div key={g.id} style={{ padding: "10px 14px", borderRadius: 10, background: "rgba(239,68,68,0.07)", border: "1px solid rgba(239,68,68,0.2)" }}>
-                      <span style={{ fontSize: 13, fontWeight: 600, color: "#f87171" }}>{g.name}</span>
+                      <span style={{ fontSize: 13, fontWeight: 600, color: SEM.danger }}>{g.name}</span>
                       <span style={{ fontSize: 12, color: "var(--muted)", marginLeft: 10 }}>No positive savings — unable to project</span>
                     </div>
                   );
@@ -326,7 +327,7 @@ export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly,
                 const reachAge     = currentAge + yearsNeeded;
                 const feasible     = g.targetAge ? reachAge <= g.targetAge : yearsNeeded <= yearsToProject;
                 const accentRGB    = feasible ? "110,231,183" : "251,191,36";
-                const accentHex    = feasible ? "#6ee7b7" : "#fbbf24";
+                const accentHex    = feasible ? "#6ee7b7" : SEM.warn;
 
                 let cpfHitAge = null;
                 if (g.currency === "SGD" && projectionData) {
