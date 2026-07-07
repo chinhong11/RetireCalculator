@@ -85,7 +85,8 @@ export function importBackup(file, onDone) {
   const reader = new FileReader();
   reader.onload = e => {
     try {
-      const data = JSON.parse(e.target.result);
+      // readAsText guarantees a string result
+      const data = JSON.parse(/** @type {string} */ (e.target.result));
       restoreBackupData(data);
       onDone(true);
     } catch { onDone(false); }

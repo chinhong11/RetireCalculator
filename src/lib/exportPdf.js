@@ -8,7 +8,12 @@ export async function exportCpfPdf({
   const { default: jsPDF } = await import("jspdf");
   const { default: autoTable } = await import("jspdf-autotable");
 
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  // jspdf-autotable patches lastAutoTable onto the doc at runtime, and
+  // getNumberOfPages exists at runtime but is missing from jsPDF's types.
+  const doc =
+    /** @type {import("jspdf").jsPDF & { lastAutoTable: { finalY: number }, internal: { getNumberOfPages(): number } }} */ (
+      new jsPDF({ unit: "mm", format: "a4" })
+    );
   const W = doc.internal.pageSize.width;
   const M = 14;
   let y = 18;
