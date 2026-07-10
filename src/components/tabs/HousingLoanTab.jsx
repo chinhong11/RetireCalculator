@@ -2,6 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { RM, RM2, uid, newProperty } from "../../lib/finance.js";
 import { loanSummary, progressiveTimeline as buildProgressiveTimeline, amortizationSchedule } from "../../lib/housing.js";
 import { toCsv, downloadBlob, printTable } from "../../lib/backup.js";
+import { notifyPersist } from "../../lib/usePersistedState.js";
 import { StatCard } from "../shared/StatCard.jsx";
 import { LabelField } from "../shared/LabelField.jsx";
 import { SEM } from "../../theme.js";
@@ -30,11 +31,11 @@ export default function HousingLoanTab() {
   const [amortYear, setAmortYear] = useState(1);
 
   useEffect(() => {
-    try { localStorage.setItem("hl_props_v1", JSON.stringify(properties)); } catch {}
+    try { localStorage.setItem("hl_props_v1", JSON.stringify(properties)); notifyPersist(); } catch {}
   }, [properties]);
 
   useEffect(() => {
-    if (selId) try { localStorage.setItem("hl_selid_v1", selId); } catch {}
+    if (selId) try { localStorage.setItem("hl_selid_v1", selId); notifyPersist(); } catch {}
   }, [selId]);
 
   const effectiveId = (properties.find(p => p.id === selId) ? selId : properties[0]?.id) || null;

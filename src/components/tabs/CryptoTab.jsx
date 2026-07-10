@@ -2,7 +2,7 @@ import { useState, useMemo, useEffect } from "react";
 import { USD, uid, COIN_IDS, fmtCoin } from "../../lib/finance.js";
 import { toCsv, downloadBlob, printTable } from "../../lib/backup.js";
 import { StatCard } from "../shared/StatCard.jsx";
-import { usePersistedState } from "../../lib/usePersistedState.js";
+import { usePersistedState, notifyPersist } from "../../lib/usePersistedState.js";
 import { fetchWithTimeout } from "../../lib/fetchWithTimeout.js";
 import { SEM } from "../../theme.js";
 
@@ -24,7 +24,7 @@ export default function CryptoTab() {
 
   useEffect(() => {
     if (Object.keys(prices).length === 0) return;
-    try { localStorage.setItem("crypto_prices_v1", JSON.stringify(prices)); } catch {}
+    try { localStorage.setItem("crypto_prices_v1", JSON.stringify(prices)); notifyPersist(); } catch {}
   }, [prices]);
 
   const fetchPrice = async (ticker) => {

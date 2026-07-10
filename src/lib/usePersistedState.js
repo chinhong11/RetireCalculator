@@ -6,6 +6,15 @@
 
 import { useState, useEffect } from "react";
 
+// Fired after every persisted write so cloud sync can schedule a push for
+// edits made in ANY tab (not just components wired to a specific trigger).
+export const PERSIST_EVENT = "app:persist";
+
+/** Announce a localStorage write to listeners (cloud sync). */
+export function notifyPersist() {
+  try { window.dispatchEvent(new Event(PERSIST_EVENT)); } catch {}
+}
+
 const serializers = {
   float: {
     parse: (raw, fallback) => {
@@ -62,6 +71,7 @@ export function usePersistedState(key, fallback, type = "float") {
 
   useEffect(() => {
     try { localStorage.setItem(key, ser.stringify(value)); } catch {}
+    notifyPersist();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [key, value]);
 

@@ -99,6 +99,12 @@ export function runMigrations() {
     try {
       MIGRATIONS[v]();
       localStorage.setItem(SCHEMA_KEY, String(v + 1));
-    } catch {}
+    } catch {
+      // Stop on failure: running later migrations against un-migrated data
+      // would corrupt it, and a later success would advance the version past
+      // the failed step so it never retried. Breaking leaves the version at
+      // the failed step, so the whole chain retries next load.
+      break;
+    }
   }
 }

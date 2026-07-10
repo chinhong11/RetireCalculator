@@ -2,10 +2,20 @@ import { useState, useEffect, useRef, useCallback } from "react";
 import { supabase } from "./supabase.js";
 import { LS_KEYS } from "./backup.js";
 import { decideSyncAction } from "./syncDecision.js";
+import { PERSIST_EVENT } from "./usePersistedState.js";
 
 // Last snapshot known to match the cloud (set after every successful push or
 // pull). Lets reconciliation tell "local changed" apart from "remote changed".
 const SYNC_BASE_KEY = "_cloud_sync_base";
+
+// Key-order-independent serialization. The remote snapshot round-trips
+// through Postgres (jsonb reorders object keys), so byte-comparing plain
+// JSON.stringify output would never match and reconciliation would thrash.
+export function canonicalJson(obj) {
+  return JSON.stringify(Object.fromEntries(
+    Object.entries(obj).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
+  ));
+}
 
 function readLocalData() {
   const data = {};
@@ -45,18 +55,20 @@ function writeBase(json) {
  * decides push vs pull; when both sides changed, the user picks a side
  * instead of either one being silently destroyed.
  *
- * @param {number} syncTrigger  Increment this whenever persisted state changes
- *                              to trigger a debounced outbound write.
+ * Outbound pushes are debounced and driven by the PERSIST_EVENT that
+ * usePersistedState (and the few raw-setItem writers) dispatch on every
+ * localStorage write — so edits in ANY tab sync, not just the CPF inputs.
+ *
  * @returns {{ user: object|null, syncing: boolean, syncError: string|null, signOut: Function }}
  */
-export function useCloudSync(syncTrigger) {
+export function useCloudSync() {
   const [user, setUser]         = useState(null);
   const [syncing, setSyncing]   = useState(false);
   const [syncError, setSyncError] = useState(null);
   const debounceRef = useRef(null);
   const userRef     = useRef(null);
   const reconciledRef = useRef(false); // run reconciliation once per page load
-  const syncReadyRef  = useRef(false); // block outbound pushes until reconciliation settles
+  const syncReadyRef  = useRef(false); // block outbound pushes until reconciliation SUCCEEDS
 
   const pushNow = useCallback(async (u, data, json) => {
     const { error } = await supabase
@@ -78,9 +90,9 @@ export function useCloudSync(syncTrigger) {
       if (error) throw new Error(error.message);
 
       const local      = readLocalData();
-      const localJson  = JSON.stringify(local);
+      const localJson  = canonicalJson(local);
       const remote     = profile?.data ?? null;
-      const remoteJson = remote ? JSON.stringify(remote) : null;
+      const remoteJson = remote ? canonicalJson(remote) : null;
 
       let action = decideSyncAction(localJson, remoteJson, readBase());
       if (action === "conflict") {
@@ -100,11 +112,17 @@ export function useCloudSync(syncTrigger) {
         writeBase(remoteJson);
         // Reload so all useState initialisers re-read from localStorage
         window.location.reload();
+        return; // don't open the push gate mid-navigation
       }
-    } catch (e) {
-      setSyncError("Could not load cloud data: " + e.message);
-    } finally {
+
+      // Open the push gate ONLY after a successful reconcile. Opening it on
+      // failure (e.g. the select threw) would let the next edit blindly
+      // upsert local state over a cloud row that was never read — the exact
+      // data-loss class this hook exists to prevent.
       syncReadyRef.current = true;
+    } catch (e) {
+      setSyncError("Cloud sync failed (changes are NOT being backed up): " + e.message);
+    } finally {
       setSyncing(false);
     }
   }, [pushNow]);
@@ -134,27 +152,30 @@ export function useCloudSync(syncTrigger) {
     return () => subscription.unsubscribe();
   }, [reconcile]);
 
-  // ── Outbound sync: debounced write to Supabase ───────────────────────────
+  // ── Outbound sync: debounced push on every persisted write ───────────────
   useEffect(() => {
-    if (!userRef.current) return;
+    const schedulePush = () => {
+      if (!userRef.current || !syncReadyRef.current) return;
+      clearTimeout(debounceRef.current);
+      debounceRef.current = setTimeout(async () => {
+        const u = userRef.current;
+        if (!u || !syncReadyRef.current) return;
+        try {
+          const data = readLocalData();
+          await pushNow(u, data, canonicalJson(data));
+          setSyncError(null);
+        } catch (e) {
+          setSyncError("Sync failed: " + e.message);
+        }
+      }, 1500);
+    };
 
-    clearTimeout(debounceRef.current);
-    debounceRef.current = setTimeout(async () => {
-      const u = userRef.current;
-      // Never push before reconciliation settles — a push racing ahead of the
-      // initial pull is exactly the stale-overwrite bug this hook guards against.
-      if (!u || !syncReadyRef.current) return;
-      try {
-        const data = readLocalData();
-        await pushNow(u, data, JSON.stringify(data));
-        setSyncError(null);
-      } catch (e) {
-        setSyncError("Sync failed: " + e.message);
-      }
-    }, 1500);
-
-    return () => clearTimeout(debounceRef.current);
-  }, [syncTrigger, pushNow]);
+    window.addEventListener(PERSIST_EVENT, schedulePush);
+    return () => {
+      window.removeEventListener(PERSIST_EVENT, schedulePush);
+      clearTimeout(debounceRef.current);
+    };
+  }, [pushNow]);
 
   const signOut = useCallback(async () => {
     await supabase.auth.signOut();

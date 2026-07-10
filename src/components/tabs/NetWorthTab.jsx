@@ -9,18 +9,41 @@ import { SEM } from "../../theme.js";
 export default function NetWorthTab({ projectionData, yearsToProject }) {
   const [usdToSgd, setUsdToSgd] = usePersistedState("fx_usd_sgd", 1.35);
   const [myrToSgd, setMyrToSgd] = usePersistedState("fx_myr_sgd", 0.30);
-  const [fxStatus, setFxStatus] = useState("idle"); // "idle" | "loading" | "live" | "error"
+  // When the user types a rate, stop auto-applying fetched rates — otherwise
+  // the mount-time fetch silently overwrites every manual edit.
+  const [fxManual, setFxManual] = usePersistedState("fx_manual", false, "bool");
+  const [fxStatus, setFxStatus] = useState("idle"); // "idle" | "loading" | "live" | "cached" | "stale" | "manual" | "error"
 
   useEffect(() => {
+    if (fxManual) { setFxStatus("manual"); return; }
     setFxStatus("loading");
     fetchFxRates()
       .then(rates => {
         setUsdToSgd(parseFloat(rates.usdToSgd.toFixed(4)));
         setMyrToSgd(parseFloat(rates.myrToSgd.toFixed(4)));
-        setFxStatus(rates.fromCache ? "live" : "live");
+        setFxStatus(rates.stale ? "stale" : rates.fromCache ? "cached" : "live");
       })
       .catch(() => setFxStatus("error"));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const setRateManually = (setter) => (e) => {
+    setter(parseFloat(e.target.value) || 0);
+    setFxManual(true);
+    setFxStatus("manual");
+  };
+
+  const useLiveRates = () => {
+    setFxManual(false);
+    setFxStatus("loading");
+    fetchFxRates()
+      .then(rates => {
+        setUsdToSgd(parseFloat(rates.usdToSgd.toFixed(4)));
+        setMyrToSgd(parseFloat(rates.myrToSgd.toFixed(4)));
+        setFxStatus(rates.stale ? "stale" : rates.fromCache ? "cached" : "live");
+      })
+      .catch(() => setFxStatus("error"));
+  };
 
   const readLS = (key, fallback = []) => { try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : fallback; } catch { return fallback; } };
 
@@ -155,20 +178,29 @@ export default function NetWorthTab({ projectionData, yearsToProject }) {
           <div style={{ fontSize: 12, color: "var(--label)", fontWeight: 600 }}>FX Rates (to SGD)</div>
           {fxStatus === "loading" && <span style={{ fontSize: 10, color: "var(--muted)" }}>fetching…</span>}
           {fxStatus === "live"    && <span style={{ fontSize: 10, color: "#6ee7b7" }}>● live (frankfurter.app)</span>}
+          {fxStatus === "cached"  && <span style={{ fontSize: 10, color: "var(--muted)" }}>● cached (&lt;1h old)</span>}
+          {fxStatus === "stale"   && <span style={{ fontSize: 10, color: SEM.warn }}>⚠ offline — using older cached rates</span>}
+          {fxStatus === "manual"  && <span style={{ fontSize: 10, color: SEM.warn }}>✎ manual rates</span>}
           {fxStatus === "error"   && <span style={{ fontSize: 10, color: SEM.danger }}>⚠ offline — using saved rates</span>}
+          {fxManual && (
+            <button onClick={useLiveRates}
+              style={{ fontSize: 10, padding: "2px 8px", borderRadius: 6, border: "1px solid var(--border)", background: "var(--input-bg)", color: "var(--accent)", cursor: "pointer", fontFamily: "inherit" }}>
+              ↺ use live rates
+            </button>
+          )}
         </div>
         <div style={{ display: "flex", gap: 20, flexWrap: "wrap", alignItems: "flex-end" }}>
           <div>
             <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>1 USD =</div>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <input type="number" min={0} step={0.01} value={usdToSgd} onChange={e => setUsdToSgd(parseFloat(e.target.value) || 0)} style={inputStyle} />
+              <input type="number" min={0} step={0.01} value={usdToSgd} onChange={setRateManually(setUsdToSgd)} style={inputStyle} />
               <span style={{ fontSize: 13, color: "var(--muted)" }}>SGD</span>
             </div>
           </div>
           <div>
             <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>1 MYR =</div>
             <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-              <input type="number" min={0} step={0.001} value={myrToSgd} onChange={e => setMyrToSgd(parseFloat(e.target.value) || 0)} style={inputStyle} />
+              <input type="number" min={0} step={0.001} value={myrToSgd} onChange={setRateManually(setMyrToSgd)} style={inputStyle} />
               <span style={{ fontSize: 13, color: "var(--muted)" }}>SGD</span>
             </div>
           </div>

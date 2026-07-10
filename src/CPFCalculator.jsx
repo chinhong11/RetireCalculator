@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect, useCallback, lazy, Suspense } from "react";
+import { useState, useMemo, useCallback, lazy, Suspense } from "react";
 
 import { CPF_FRS_2026, CPF_BHS_2026, computeMonthly, projectYears, estimateCpfLifePayout, fmtD } from "./lib/cpf.js";
 import { useCloudSync } from "./lib/useCloudSync.js";
@@ -70,16 +70,11 @@ export default function CPFCalculator() {
   // Show a first-run banner until the user changes salary (key not in storage yet)
   const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem("cpf_salary"));
   const [showAuthModal, setShowAuthModal] = useState(false);
-  const [syncTrigger, setSyncTrigger] = useState(0);
 
   // ─── Cloud sync ─────────────────────────────────────────────────────────
-  const { user, syncing, syncError, signOut } = useCloudSync(syncTrigger);
-
-  // Increment syncTrigger whenever any persisted value changes so useCloudSync debounces an outbound write
-  useEffect(() => { setSyncTrigger(n => n + 1); },
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [salary, age, prYear, annualIncrement, yearsToProject, oaReturn, saReturn, maReturn,
-     oaStart, saStart, maStart, ceilingGrowth, saShield, saShieldOn]);
+  // Outbound pushes are driven by the persist event that usePersistedState
+  // dispatches on every localStorage write — edits in any tab sync.
+  const { user, syncing, syncError, signOut } = useCloudSync();
 
   // ─── Derived data ────────────────────────────────────────────────────────
   const effectiveSaShield = age < 55 && saShieldOn ? saShield : 0;

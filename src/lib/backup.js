@@ -1,6 +1,6 @@
 // ─── Export / Backup helpers ──────────────────────────────────────────
 
-export const LS_KEYS = ["_schema_version","theme","active_tab","cpf_salary","cpf_age","cpf_pr_year","cpf_increment","cpf_years","cpf_oa_return","cpf_sa_return","cpf_ma_return","cpf_oa_start","cpf_sa_start","cpf_ma_start","cpf_ceiling_growth","cpf_sa_shield","cpf_sa_shield_on","hl_props_v1","hl_selid_v1","stocks_v1","crypto_v1","mystocks_v1","stocks_prices_v1","crypto_prices_v1","mystocks_prices_v1","goals_v1","epf_per_start","epf_sej_start","epf_flek_start","fd_v1","epf_wage","epf_age","epf_retire_age","epf_increment","epf_dividend","fx_usd_sgd","fx_myr_sgd","sav_income","sav_other","sav_start_cash","sav_cash_return","sav_expenses_v1","fire_monthly_exp","fire_rate","fire_incl_epf","fire_incl_cash"];
+export const LS_KEYS = ["_schema_version","theme","active_tab","cpf_salary","cpf_age","cpf_pr_year","cpf_increment","cpf_years","cpf_oa_return","cpf_sa_return","cpf_ma_return","cpf_oa_start","cpf_sa_start","cpf_ma_start","cpf_ceiling_growth","cpf_sa_shield","cpf_sa_shield_on","hl_props_v1","hl_selid_v1","stocks_v1","crypto_v1","mystocks_v1","stocks_prices_v1","crypto_prices_v1","mystocks_prices_v1","goals_v1","epf_per_start","epf_sej_start","epf_flek_start","fd_v1","epf_wage","epf_age","epf_retire_age","epf_increment","epf_dividend","fx_usd_sgd","fx_myr_sgd","fx_manual","sav_income","sav_other","sav_start_cash","sav_cash_return","sav_expenses_v1","fire_monthly_exp","fire_rate","fire_incl_epf","fire_incl_cash"];
 
 export function downloadBlob(filename, content, type = "text/plain") {
   const blob = new Blob([content], { type });
@@ -60,7 +60,11 @@ export function collectBackupData() {
 }
 
 /**
- * Write a backup object back into localStorage.
+ * Write a backup object back into localStorage, MIRRORING the file: keys
+ * absent from the backup are removed (same semantics as a cloud pull), so a
+ * restore replaces state rather than merging old records into current ones.
+ * Removing an absent _schema_version also makes migrations re-run after the
+ * post-restore reload, backfilling any pre-versioning records in old files.
  *
  * Storage holds RAW values ("summary", "5000", "true", "[…]"). Export parses
  * them where possible, so numbers/bools/arrays arrive here as their JSON types
@@ -70,10 +74,14 @@ export function collectBackupData() {
  */
 export function restoreBackupData(data) {
   LS_KEYS.forEach(k => {
-    if (k in data) {
-      const v = data[k];
-      try { localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v)); } catch {}
-    }
+    try {
+      if (k in data) {
+        const v = data[k];
+        localStorage.setItem(k, typeof v === "string" ? v : JSON.stringify(v));
+      } else {
+        localStorage.removeItem(k);
+      }
+    } catch {}
   });
 }
 

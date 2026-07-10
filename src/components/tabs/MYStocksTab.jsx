@@ -3,7 +3,7 @@ import { RM, RM2, uid } from "../../lib/finance.js";
 import { toCsv, downloadBlob, printTable } from "../../lib/backup.js";
 import { StatCard } from "../shared/StatCard.jsx";
 import { fetchYahooChart } from "../../lib/fetchPrice.js";
-import { usePersistedState } from "../../lib/usePersistedState.js";
+import { usePersistedState, notifyPersist } from "../../lib/usePersistedState.js";
 import { SEM } from "../../theme.js";
 
 export default function MYStocksTab() {
@@ -19,7 +19,7 @@ export default function MYStocksTab() {
 
   useEffect(() => {
     if (Object.keys(prices).length === 0) return;
-    try { localStorage.setItem("mystocks_prices_v1", JSON.stringify(prices)); } catch {}
+    try { localStorage.setItem("mystocks_prices_v1", JSON.stringify(prices)); notifyPersist(); } catch {}
   }, [prices]);
 
   const toYahooTicker = (code) => {
