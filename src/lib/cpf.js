@@ -226,10 +226,14 @@ export function projectYears({
       currentAge    += 1;
       currentPRYear += 1;
 
-      // 3. RA formation at 55: only uninvested SA transferred; CPFIS-SA liquidated → OA
+      // 3. RA formation at 55: uninvested SA transfers to RA up to the FRS;
+      //    SA above the FRS goes to OA (post-2025 SA closure). CPFIS-SA is
+      //    liquidated → OA.
       if (!raFormed && currentAge >= 55) {
         raFormed  = true;
-        raBalance = saBalance;   // only the uninvested (non-shielded) SA
+        const saToRa = Math.min(saBalance, currentFrs);
+        raBalance = saToRa;
+        oaBalance += saBalance - saToRa;
         saBalance = 0;
         const topUp = Math.min(oaBalance, Math.max(0, currentFrs - raBalance));
         raBalance  += topUp;
@@ -257,12 +261,20 @@ export function projectYears({
       else          saBalance += extra;
     }
 
-    // 5. Twelve months of contributions
+    // 5. Twelve months of contributions. After 55, the RA allocation only
+    //    fills RA up to the FRS; the remainder is paid to OA. (Interest may
+    //    still grow RA past the FRS — the cap applies to inflows, not growth.)
     const monthly = computeMonthly(currentSalary, currentAge, currentPRYear);
     if (y > 0) {
       oaBalance += monthly.oaAmount * 12;
-      if (raFormed) raBalance += monthly.saAmount * 12;
-      else          saBalance += monthly.saAmount * 12;
+      const saYear = monthly.saAmount * 12;
+      if (raFormed) {
+        const toRa = Math.min(saYear, Math.max(0, currentFrs - raBalance));
+        raBalance += toRa;
+        oaBalance += saYear - toRa;
+      } else {
+        saBalance += saYear;
+      }
       maBalance += monthly.maAmount * 12;
 
       // MA contribution overflow → SA/RA (FRS-capped) / OA
