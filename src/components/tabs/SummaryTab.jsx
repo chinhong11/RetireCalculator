@@ -7,6 +7,10 @@ import { SEM } from "../../theme.js";
 function lsJson(key) {
   try { const s = localStorage.getItem(key); return s ? JSON.parse(s) : []; } catch { return []; }
 }
+function lsNum(key, fallback) {
+  const n = parseFloat(localStorage.getItem(key));
+  return Number.isFinite(n) ? n : fallback;
+}
 
 export default function SummaryTab({ cpfData, yearsToProject, projectionData }) {
   // Read once on mount; re-read whenever the tab becomes visible so data
@@ -15,6 +19,9 @@ export default function SummaryTab({ cpfData, yearsToProject, projectionData }) 
   const [stockHoldings,  setStockHoldings]  = useState(() => lsJson("stocks_v1"));
   const [cryptoHoldings, setCryptoHoldings] = useState(() => lsJson("crypto_v1"));
   const [myStockHoldings, setMyStockHoldings] = useState(() => lsJson("mystocks_v1"));
+  // FX rates shared with the Net Worth tab (same localStorage keys/defaults)
+  const [usdToSgd, setUsdToSgd] = useState(() => lsNum("fx_usd_sgd", 1.35));
+  const [myrToSgd, setMyrToSgd] = useState(() => lsNum("fx_myr_sgd", 0.30));
 
   useEffect(() => {
     const refresh = () => {
@@ -22,6 +29,8 @@ export default function SummaryTab({ cpfData, yearsToProject, projectionData }) 
       setStockHoldings(lsJson("stocks_v1"));
       setCryptoHoldings(lsJson("crypto_v1"));
       setMyStockHoldings(lsJson("mystocks_v1"));
+      setUsdToSgd(lsNum("fx_usd_sgd", 1.35));
+      setMyrToSgd(lsNum("fx_myr_sgd", 0.30));
     };
     window.addEventListener("focus", refresh);
     return () => window.removeEventListener("focus", refresh);
@@ -68,6 +77,17 @@ export default function SummaryTab({ cpfData, yearsToProject, projectionData }) 
   const currentByCurrency = { SGD: cpfTotal, MYR: totalEquity + myStocksCost, USD: stocksCost + cryptoCost };
   const fmtByCurrency     = { SGD, MYR: RM, USD };
 
+  // ─── Unified net worth (SGD) — sums the three currency blocks shown below,
+  //     so the hero figure reconciles exactly with the sections on this page.
+  const sgdFromMyr = (totalEquity + myStocksCost) * myrToSgd;
+  const sgdFromUsd = (stocksCost + cryptoCost) * usdToSgd;
+  const netWorthSgd = cpfTotal + sgdFromMyr + sgdFromUsd;
+  const nwParts = [
+    { label: "CPF", sgd: cpfTotal, color: "var(--accent)" },
+    { label: "MYR assets", sgd: sgdFromMyr, color: SEM.ma },
+    { label: "USD assets", sgd: sgdFromUsd, color: "var(--accent2)" },
+  ].filter(p => p.sgd > 0);
+
   const cpfAgeForTarget = (target) => {
     if (!projectionData) return null;
     const hit = projectionData.find(d => d.total >= target);
@@ -96,14 +116,44 @@ export default function SummaryTab({ cpfData, yearsToProject, projectionData }) 
 
   return (
     <div>
+      {/* ── Unified net-worth hero ─────────────────────────────────────── */}
       <div style={{
-        display: "flex", gap: 10, alignItems: "flex-start",
-        padding: "12px 16px", borderRadius: 10,
-        background: "var(--accent-chip)", border: "1px solid var(--accent-border-c)",
-        fontSize: 12, color: "var(--label)", marginBottom: 20, lineHeight: 1.7,
+        background: "linear-gradient(135deg, var(--accent-subtle) 0%, transparent 55%)",
+        border: "1px solid var(--accent-border-c)", borderRadius: 16,
+        padding: "22px 24px", marginBottom: 16,
       }}>
-        <span style={{ fontSize: 14, flexShrink: 0, color: "var(--accent)", fontWeight: 700, lineHeight: 1.7 }}>ℹ️</span>
-        <span>Your assets span multiple currencies — <strong style={{ color: "var(--accent)" }}>SGD</strong> (CPF), <strong style={{ color: "var(--text)" }}>MYR</strong> (Property &amp; MY Stocks), <strong style={{ color: "var(--accent2)" }}>USD</strong> (US Stocks &amp; Crypto). Values are shown in their native currency without conversion. Stock and crypto figures reflect cost basis; visit those tabs to see live P&amp;L.</span>
+        <div style={{ fontSize: 10, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted)", fontWeight: 700, marginBottom: 6 }}>
+          Estimated Total Net Worth
+        </div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+          <span style={{ fontSize: 38, fontWeight: 800, fontFamily: "'DM Mono', monospace", color: "var(--accent)", lineHeight: 1.1 }}>
+            ≈ {SGD(netWorthSgd)}
+          </span>
+          <span style={{ fontSize: 12, color: "var(--muted)" }}>in SGD</span>
+        </div>
+
+        {/* Composition bar */}
+        {netWorthSgd > 0 && (
+          <div style={{ display: "flex", height: 8, borderRadius: 6, overflow: "hidden", marginTop: 14, background: "var(--track)" }}>
+            {nwParts.map(p => (
+              <div key={p.label} title={`${p.label}: ${SGD(p.sgd)}`}
+                style={{ width: `${(p.sgd / netWorthSgd) * 100}%`, background: p.color }} />
+            ))}
+          </div>
+        )}
+        <div style={{ display: "flex", gap: 16, flexWrap: "wrap", marginTop: 10 }}>
+          {nwParts.map(p => (
+            <div key={p.label} style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 11, color: "var(--label)" }}>
+              <span style={{ width: 8, height: 8, borderRadius: 2, background: p.color, display: "inline-block" }} />
+              {p.label} · <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 600 }}>{SGD(p.sgd)}</span>
+              <span style={{ color: "var(--muted)" }}>({((p.sgd / netWorthSgd) * 100).toFixed(0)}%)</span>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ fontSize: 11, color: "var(--muted)", lineHeight: 1.6, marginTop: 14, paddingTop: 12, borderTop: "1px solid var(--border)" }}>
+          CPF is <strong style={{ color: "var(--label)" }}>projected to age {cpfFinalAge}</strong>; property &amp; investments are at <strong style={{ color: "var(--label)" }}>cost basis</strong>. Converted at 1 USD = {usdToSgd.toFixed(2)} · 1 MYR = {myrToSgd.toFixed(2)} SGD (edit in the Net Worth tab, which also includes EPF, fixed deposits &amp; live prices).
+        </div>
       </div>
 
       {/* CPF (SGD) */}

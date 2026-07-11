@@ -96,7 +96,30 @@ describe("SummaryTab", () => {
 
   it("renders the projected CPF total", () => {
     renderTab();
-    expect(screen.getByText("S$220,000")).toBeInTheDocument();
+    // Appears in both the net-worth hero and the CPF section
+    expect(screen.getAllByText("S$220,000").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("shows a unified net-worth hero that sums the currency blocks in SGD", () => {
+    // CPF 220k (SGD) + property equity 50k MYR ×0.30 + stocks 1800 USD ×1.35
+    localStorage.setItem("fx_myr_sgd", "0.30");
+    localStorage.setItem("fx_usd_sgd", "1.35");
+    localStorage.setItem("hl_props_v1", JSON.stringify([
+      { id: "p", name: "C", purchasePrice: 200000, downpaymentRecords: [{ id: "d", amount: 50000 }] },
+    ]));
+    localStorage.setItem("stocks_v1", JSON.stringify([
+      { id: "s", ticker: "AAPL", shares: 10, avgCost: 180, totalFees: 0 },
+    ]));
+    renderTab();
+    // 220000 + 50000*0.30 (15000) + 1800*1.35 (2430) = 237430
+    expect(screen.getByText(/Estimated Total Net Worth/i)).toBeInTheDocument();
+    expect(screen.getByText("≈ S$237,430")).toBeInTheDocument();
+  });
+
+  it("net-worth hero is CPF-only (100%) when no assets are entered", () => {
+    renderTab();
+    expect(screen.getByText("≈ S$220,000")).toBeInTheDocument();
+    expect(screen.getByText(/CPF ·/)).toBeInTheDocument();
   });
 
   it("adds a goal and shows progress against the mapped currency", () => {
