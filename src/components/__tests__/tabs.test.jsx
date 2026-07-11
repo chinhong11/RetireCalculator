@@ -5,6 +5,7 @@ import "@testing-library/jest-dom/vitest";
 
 import HousingLoanTab from "../tabs/HousingLoanTab.jsx";
 import SummaryTab from "../tabs/SummaryTab.jsx";
+import { QuickStart } from "../shared/QuickStart.jsx";
 
 beforeEach(() => localStorage.clear());
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -168,5 +169,47 @@ describe("SummaryTab", () => {
     renderTab();
     fireEvent.click(screen.getByText("+ Add"));
     expect(localStorage.getItem("goals_v1")).toBe("[]");
+  });
+});
+
+// ─── QuickStart — first-run onboarding ────────────────────────────────────────
+
+describe("QuickStart", () => {
+  const setup = (over = {}) => {
+    const onComplete = vi.fn();
+    const onClose = vi.fn();
+    render(<QuickStart initialSalary={5000} initialAge={30} initialPrYear={1}
+      monthlyContrib={450} onComplete={onComplete} onClose={onClose} {...over} />);
+    return { onComplete, onClose };
+  };
+
+  it("renders the three setup questions", () => {
+    setup();
+    expect(screen.getByText(/Monthly salary/i)).toBeInTheDocument();
+    expect(screen.getByText(/Your age/i)).toBeInTheDocument();
+    expect(screen.getByText(/PR status year/i)).toBeInTheDocument();
+  });
+
+  it("submitting fires onComplete with entered values and shows the ready screen", () => {
+    const { onComplete } = setup();
+    fireEvent.change(screen.getByPlaceholderText("e.g. 5000"), { target: { value: "7000" } });
+    fireEvent.click(screen.getByRole("button", { name: /See my projection/ }));
+    expect(onComplete).toHaveBeenCalledWith({ salary: 7000, age: 30, prYear: 1 });
+    expect(screen.getByText(/Your CPF projection is ready/i)).toBeInTheDocument();
+  });
+
+  it("the ready screen closes as completed", () => {
+    const { onClose } = setup();
+    fireEvent.change(screen.getByPlaceholderText("e.g. 5000"), { target: { value: "7000" } });
+    fireEvent.click(screen.getByRole("button", { name: /See my projection/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Explore my projection/ }));
+    expect(onClose).toHaveBeenCalledWith(true);
+  });
+
+  it("skip closes as not-completed without applying values", () => {
+    const { onComplete, onClose } = setup();
+    fireEvent.click(screen.getByRole("button", { name: /Skip/ }));
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledWith(false);
   });
 });

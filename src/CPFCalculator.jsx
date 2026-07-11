@@ -12,6 +12,7 @@ import { TabBar }  from "./components/layout/TabBar.jsx";
 import { ErrorBoundary }   from "./components/shared/ErrorBoundary.jsx";
 import { CpfSummaryCards } from "./components/shared/CpfSummaryCards.jsx";
 import { AuthModal }       from "./components/shared/AuthModal.jsx";
+import { QuickStart }      from "./components/shared/QuickStart.jsx";
 
 // Tabs are lazy so Recharts/heavy tab code loads on demand instead of
 // blocking first paint. (exportPdf — and jsPDF with it — is dynamically
@@ -67,8 +68,11 @@ export default function CPFCalculator() {
   const [pdfBusy, setPdfBusy]       = useState(false);
   const [pdfError, setPdfError]     = useState(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  // Show a first-run banner until the user changes salary (key not in storage yet)
-  const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem("cpf_salary"));
+  // First run = the salary key has never been written. Show the quick-start
+  // modal; the lighter welcome banner only appears if it's skipped.
+  const [firstRun] = useState(() => !localStorage.getItem("cpf_salary"));
+  const [showQuickStart, setShowQuickStart] = useState(firstRun);
+  const [showWelcome, setShowWelcome] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
   const [backupNudgeDismissed, setBackupNudgeDismissed] =
     useState(() => localStorage.getItem("backup_nudge_dismissed") === "true");
@@ -342,6 +346,16 @@ export default function CPFCalculator() {
         </div>
 
       </div>
+
+      {/* ── First-run quick start ───────────────────────────────────────── */}
+      {showQuickStart && (
+        <QuickStart
+          initialSalary={salary} initialAge={age} initialPrYear={prYear}
+          monthlyContrib={monthly.totalContrib}
+          onComplete={({ salary: s, age: a, prYear: p }) => { setSalary(s); setAge(a); setPrYear(p); }}
+          onClose={(completed) => { setShowQuickStart(false); if (!completed) setShowWelcome(true); }}
+        />
+      )}
 
       {/* ── Auth modal ──────────────────────────────────────────────────── */}
       {showAuthModal && (
