@@ -31,7 +31,10 @@ export function loanSummary(property) {
  * latter produced an Invalid Date.
  */
 function monthStart(dateStr) {
-  return new Date(dateStr.slice(0, 7) + "-01");
+  // Construct as a LOCAL date: new Date("YYYY-MM-DD") parses as UTC, which
+  // reads back one month early through getMonth() in negative-offset zones.
+  const [y, m] = dateStr.split("-");
+  return new Date(Number(y), Number(m) - 1, 1);
 }
 
 /** Whole months between two date strings (end − start), month granularity. */

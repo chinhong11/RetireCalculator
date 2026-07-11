@@ -3,7 +3,8 @@ import { USD, uid } from "../../lib/finance.js";
 import { toCsv, downloadBlob, printTable } from "../../lib/backup.js";
 import { StatCard } from "../shared/StatCard.jsx";
 import { fetchYahooChart } from "../../lib/fetchPrice.js";
-import { usePersistedState } from "../../lib/usePersistedState.js";
+import { usePersistedState, notifyPersist } from "../../lib/usePersistedState.js";
+import { SEM } from "../../theme.js";
 
 export default function StocksTab() {
   const [holdings, setHoldings] = usePersistedState("stocks_v1", [], "jsonArray");
@@ -18,7 +19,7 @@ export default function StocksTab() {
 
   useEffect(() => {
     if (Object.keys(prices).length === 0) return;
-    try { localStorage.setItem("stocks_prices_v1", JSON.stringify(prices)); } catch {}
+    try { localStorage.setItem("stocks_prices_v1", JSON.stringify(prices)); notifyPersist(); } catch {}
   }, [prices]);
 
   const fetchPrice = async (ticker) => {
@@ -146,7 +147,7 @@ export default function StocksTab() {
           label="Total P&L"
           value={priced.length ? USD(totalPnl) : "—"}
           sub={totalPnlPct !== null ? `${totalPnl >= 0 ? "+" : ""}${totalPnlPct.toFixed(2)}% overall` : "Refresh to see"}
-          color={totalPnl >= 0 ? "#4ade80" : "#f87171"}
+          color={totalPnl >= 0 ? SEM.oa : SEM.danger}
         />
       </div>
 
@@ -253,7 +254,7 @@ export default function StocksTab() {
                         ) : err ? (
                           <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                             <div style={{ display: "flex", gap: 6 }}>
-                              <button onClick={() => fetchPrice(h.ticker)} style={{ color: "#f87171", background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: 0 }} title={err}>⚠ Retry</button>
+                              <button onClick={() => fetchPrice(h.ticker)} style={{ color: SEM.danger, background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: 0 }} title={err}>⚠ Retry</button>
                               <button onClick={() => startEditing(h.ticker)} style={{ color: "var(--muted)", background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: 0 }} title="Enter price manually">✎ Manual</button>
                             </div>
                           </div>
@@ -267,7 +268,7 @@ export default function StocksTab() {
                               <div style={{ fontSize: 10, color: "var(--muted)", fontStyle: "italic" }}>manual</div>
                             ) : h.pd.prevClose != null && (() => {
                               const chg = ((h.pd.price - h.pd.prevClose) / h.pd.prevClose) * 100;
-                              return <div style={{ fontSize: 11, color: chg >= 0 ? "#4ade80" : "#f87171" }}>{chg >= 0 ? "▲" : "▼"} {Math.abs(chg).toFixed(2)}% today</div>;
+                              return <div style={{ fontSize: 11, color: chg >= 0 ? SEM.oa : SEM.danger }}>{chg >= 0 ? "▲" : "▼"} {Math.abs(chg).toFixed(2)}% today</div>;
                             })()}
                           </div>
                         ) : (
@@ -281,13 +282,13 @@ export default function StocksTab() {
                         {h.value !== null ? USD(h.value) : "—"}
                       </td>
                       <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>
-                        {h.pnl !== null ? <span style={{ color: h.pnl >= 0 ? "#4ade80" : "#f87171" }}>{h.pnl >= 0 ? "+" : ""}{USD(h.pnl)}</span> : "—"}
+                        {h.pnl !== null ? <span style={{ color: h.pnl >= 0 ? SEM.oa : SEM.danger }}>{h.pnl >= 0 ? "+" : ""}{USD(h.pnl)}</span> : "—"}
                       </td>
                       <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>
-                        {h.pnlPct !== null ? <span style={{ color: h.pnlPct >= 0 ? "#4ade80" : "#f87171" }}>{h.pnlPct >= 0 ? "+" : ""}{h.pnlPct.toFixed(2)}%</span> : "—"}
+                        {h.pnlPct !== null ? <span style={{ color: h.pnlPct >= 0 ? SEM.oa : SEM.danger }}>{h.pnlPct >= 0 ? "+" : ""}{h.pnlPct.toFixed(2)}%</span> : "—"}
                       </td>
                       <td style={{ padding: "12px 14px" }}>
-                        <button onClick={() => delHolding(h.id)} style={{ color: "#f87171", background: "none", border: "none", cursor: "pointer", fontSize: 14, padding: "2px 8px" }}>✕</button>
+                        <button onClick={() => delHolding(h.id)} style={{ color: SEM.danger, background: "none", border: "none", cursor: "pointer", fontSize: 14, padding: "2px 8px" }}>✕</button>
                       </td>
                     </tr>
                   );
@@ -302,10 +303,10 @@ export default function StocksTab() {
                     <td />
                     <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>{priced.length ? USD(totalValue) : "—"}</td>
                     <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 800 }}>
-                      {priced.length ? <span style={{ color: totalPnl >= 0 ? "#4ade80" : "#f87171" }}>{totalPnl >= 0 ? "+" : ""}{USD(totalPnl)}</span> : "—"}
+                      {priced.length ? <span style={{ color: totalPnl >= 0 ? SEM.oa : SEM.danger }}>{totalPnl >= 0 ? "+" : ""}{USD(totalPnl)}</span> : "—"}
                     </td>
                     <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 800 }}>
-                      {totalPnlPct !== null ? <span style={{ color: totalPnlPct >= 0 ? "#4ade80" : "#f87171" }}>{totalPnlPct >= 0 ? "+" : ""}{totalPnlPct.toFixed(2)}%</span> : "—"}
+                      {totalPnlPct !== null ? <span style={{ color: totalPnlPct >= 0 ? SEM.oa : SEM.danger }}>{totalPnlPct >= 0 ? "+" : ""}{totalPnlPct.toFixed(2)}%</span> : "—"}
                     </td>
                     <td />
                   </tr>

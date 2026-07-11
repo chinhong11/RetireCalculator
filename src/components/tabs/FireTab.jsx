@@ -3,6 +3,7 @@ import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianG
 import { projectEpfYears } from "../../lib/epf.js";
 import { totalDownpayment } from "../../lib/housing.js";
 import { usePersistedState } from "../../lib/usePersistedState.js";
+import { SEM } from "../../theme.js";
 
 export default function FireTab({ projectionData, yearsToProject }) {
   const [monthlyExpenses, setMonthlyExpenses] = usePersistedState("fire_monthly_exp", 3000);
@@ -165,7 +166,7 @@ export default function FireTab({ projectionData, yearsToProject }) {
           </div>
           <div style={{ textAlign: "right" }}>
             <div style={{ fontSize: 11, color: "var(--muted)" }}>Gap to FIRE</div>
-            <div style={{ fontSize: 22, fontWeight: 700, color: gap === 0 ? "#6ee7b7" : "#f87171", fontFamily: "'DM Mono', monospace" }}>{fmtSGD(gap)}</div>
+            <div style={{ fontSize: 22, fontWeight: 700, color: gap === 0 ? "#6ee7b7" : SEM.danger, fontFamily: "'DM Mono', monospace" }}>{fmtSGD(gap)}</div>
           </div>
         </div>
         <div style={{ height: 20, borderRadius: 10, background: "rgba(255,255,255,0.07)", overflow: "hidden" }}>
@@ -195,7 +196,7 @@ export default function FireTab({ projectionData, yearsToProject }) {
         </div>
       ) : (
         <div style={{ ...cardStyle, background: "rgba(239,68,68,0.06)", border: "1px solid rgba(239,68,68,0.2)", textAlign: "center", padding: "20px" }}>
-          <div style={{ fontSize: 14, color: "#f87171", fontWeight: 600 }}>FIRE not reached within {yearsToProject}-year window</div>
+          <div style={{ fontSize: 14, color: SEM.danger, fontWeight: 600 }}>FIRE not reached within {yearsToProject}-year window</div>
           <div style={{ fontSize: 12, color: "var(--muted)", marginTop: 6 }}>
             Try: extending the projection slider · increasing savings rate · lowering target expenses
           </div>
@@ -207,7 +208,7 @@ export default function FireTab({ projectionData, yearsToProject }) {
           { label: "Annual expenses",               value: fmtSGD(annualExpenses),   color: "var(--muted)" },
           { label: "FIRE number",                   value: fmtSGDM(fireNumber),      color: FIRE_COLOR     },
           { label: "Monthly passive income @ FIRE", value: fmtSGD(monthlyExpenses),  color: "#6ee7b7"      },
-          { label: "Withdrawal rate",               value: `${withdrawalRate}%`,      color: "#818cf8"      },
+          { label: "Withdrawal rate",               value: `${withdrawalRate}%`,      color: SEM.sa      },
         ].map(({ label, value, color }) => (
           <div key={label} style={{ ...cardStyle, textAlign: "center" }}>
             <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 4 }}>{label}</div>

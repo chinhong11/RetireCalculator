@@ -8,7 +8,12 @@ export async function exportCpfPdf({
   const { default: jsPDF } = await import("jspdf");
   const { default: autoTable } = await import("jspdf-autotable");
 
-  const doc = new jsPDF({ unit: "mm", format: "a4" });
+  // jspdf-autotable patches lastAutoTable onto the doc at runtime, and
+  // getNumberOfPages exists at runtime but is missing from jsPDF's types.
+  const doc =
+    /** @type {import("jspdf").jsPDF & { lastAutoTable: { finalY: number }, internal: { getNumberOfPages(): number } }} */ (
+      new jsPDF({ unit: "mm", format: "a4" })
+    );
   const W = doc.internal.pageSize.width;
   const M = 14;
   let y = 18;
@@ -94,7 +99,10 @@ export async function exportCpfPdf({
   }
 
   // ─── Year-by-year table ──────────────────────────────────────────────────
-  // Keep one row per year but truncate very long projections (max 41 rows = yr 0..40)
+  // One row per year (the projection slider caps at 40 years, so ≤41 rows).
+  // A CPFIS-SA column is included when shielding is active — the shielded pot
+  // is part of Total CPF, so without it the account columns wouldn't sum.
+  const showCpfis = saShield > 0;
   const tableRows = projectionData.map(d => [
     d.year,
     d.age,
@@ -102,6 +110,7 @@ export async function exportCpfPdf({
     fmtD(d.salary),
     fmtD(d.oa),
     d.raFormed ? "—" : fmtD(d.sa),
+    ...(showCpfis ? [d.cpfis > 0 ? fmtD(d.cpfis) : "—"] : []),
     d.raFormed ? fmtD(d.ra) : "—",
     fmtD(d.ma),
     fmtD(d.total),
@@ -118,7 +127,7 @@ export async function exportCpfPdf({
 
   autoTable(doc, {
     startY: y,
-    head: [["Yr", "Age", "PR", "Salary", "OA", "SA", "RA", "MA", "Total CPF"]],
+    head: [["Yr", "Age", "PR", "Salary", "OA", "SA", ...(showCpfis ? ["CPFIS-SA"] : []), "RA", "MA", "Total CPF"]],
     body: tableRows,
     theme: "striped",
     headStyles: {
@@ -132,12 +141,9 @@ export async function exportCpfPdf({
       0: { halign: "right", cellWidth: 10 },
       1: { halign: "right", cellWidth: 11 },
       2: { halign: "right", cellWidth: 10 },
-      3: { halign: "right" },
-      4: { halign: "right" },
-      5: { halign: "right" },
-      6: { halign: "right" },
-      7: { halign: "right" },
-      8: { halign: "right", fontStyle: "bold" },
+      // Remaining numeric columns right-aligned; the last (Total) is bold
+      ...Object.fromEntries(Array.from({ length: showCpfis ? 6 : 5 }, (_, i) => [i + 3, { halign: "right" }])),
+      [showCpfis ? 9 : 8]: { halign: "right", fontStyle: "bold" },
     },
     didParseCell(data) {
       if (data.section !== "body") return;

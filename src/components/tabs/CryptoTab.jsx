@@ -2,8 +2,9 @@ import { useState, useMemo, useEffect } from "react";
 import { USD, uid, COIN_IDS, fmtCoin } from "../../lib/finance.js";
 import { toCsv, downloadBlob, printTable } from "../../lib/backup.js";
 import { StatCard } from "../shared/StatCard.jsx";
-import { usePersistedState } from "../../lib/usePersistedState.js";
+import { usePersistedState, notifyPersist } from "../../lib/usePersistedState.js";
 import { fetchWithTimeout } from "../../lib/fetchWithTimeout.js";
+import { SEM } from "../../theme.js";
 
 export default function CryptoTab() {
   const [holdings, setHoldings] = usePersistedState("crypto_v1", [], "jsonArray");
@@ -23,7 +24,7 @@ export default function CryptoTab() {
 
   useEffect(() => {
     if (Object.keys(prices).length === 0) return;
-    try { localStorage.setItem("crypto_prices_v1", JSON.stringify(prices)); } catch {}
+    try { localStorage.setItem("crypto_prices_v1", JSON.stringify(prices)); notifyPersist(); } catch {}
   }, [prices]);
 
   const fetchPrice = async (ticker) => {
@@ -149,7 +150,7 @@ export default function CryptoTab() {
     ]),
   }]);
 
-  const GOLD = "#fbbf24";
+  const GOLD = SEM.warn;
   const addBtnStyle = { padding: "8px 18px", borderRadius: 8, background: "rgba(251,191,36,0.12)", color: GOLD, border: "1px solid rgba(251,191,36,0.25)", cursor: "pointer", fontWeight: 600, fontSize: 13, fontFamily: "inherit", whiteSpace: "nowrap" };
   const exportBtnStyle = { padding: "6px 12px", borderRadius: 7, border: "1px solid var(--border)", background: "rgba(255,255,255,0.04)", color: "var(--label)", fontSize: 11, fontWeight: 600, cursor: "pointer", fontFamily: "inherit" };
   const thS = (align) => ({ padding: "12px 14px", textAlign: align, fontSize: 11, fontWeight: 600, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.06em", whiteSpace: "nowrap" });
@@ -174,7 +175,7 @@ export default function CryptoTab() {
           label="Total P&L"
           value={priced.length ? USD(totalPnl) : "—"}
           sub={totalPnlPct !== null ? `${totalPnl >= 0 ? "+" : ""}${totalPnlPct.toFixed(2)}% overall` : "Refresh to see"}
-          color={totalPnl >= 0 ? "#4ade80" : "#f87171"}
+          color={totalPnl >= 0 ? SEM.oa : SEM.danger}
         />
       </div>
 
@@ -321,7 +322,7 @@ export default function CryptoTab() {
                           <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 800, color: GOLD, fontSize: 15 }}>{fmtCoin(dcaResult.newAvgCost)}</span>
 
                           <span style={{ color: "var(--muted)", fontSize: 12 }}>vs current avg</span>
-                          <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 600, color: dcaResult.change <= 0 ? "#4ade80" : "#f87171" }}>
+                          <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 600, color: dcaResult.change <= 0 ? SEM.oa : SEM.danger }}>
                             {dcaResult.change >= 0 ? "+" : ""}{fmtCoin(dcaResult.change)} ({dcaResult.changePct >= 0 ? "+" : ""}{dcaResult.changePct.toFixed(2)}%)
                           </span>
 
@@ -340,7 +341,7 @@ export default function CryptoTab() {
                         return (
                           <div style={{ marginTop: 10, padding: "10px 14px", borderRadius: 8, background: "var(--hover-bg)", border: "1px solid var(--border)", fontSize: 12 }}>
                             <div style={{ color: "var(--muted)", marginBottom: 3 }}>P&amp;L at live price ({fmtCoin(live)})</div>
-                            <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, color: pnlPct >= 0 ? "#4ade80" : "#f87171" }}>
+                            <div style={{ fontFamily: "'DM Mono', monospace", fontWeight: 700, color: pnlPct >= 0 ? SEM.oa : SEM.danger }}>
                               {pnlPct >= 0 ? "+" : ""}{pnlPct.toFixed(2)}% &nbsp;·&nbsp; {pnl >= 0 ? "+" : ""}{USD(pnl)}
                             </div>
                           </div>
@@ -417,7 +418,7 @@ export default function CryptoTab() {
                           </div>
                         ) : err ? (
                           <div style={{ display: "flex", gap: 6, justifyContent: "flex-end" }}>
-                            <button onClick={() => fetchPrice(h.ticker)} style={{ color: "#f87171", background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: 0 }} title={err}>⚠ Retry</button>
+                            <button onClick={() => fetchPrice(h.ticker)} style={{ color: SEM.danger, background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: 0 }} title={err}>⚠ Retry</button>
                             <button onClick={() => startEditing(h.ticker)} style={{ color: "var(--muted)", background: "none", border: "none", cursor: "pointer", fontSize: 11, padding: 0 }} title="Enter price manually">✎ Manual</button>
                           </div>
                         ) : h.pd ? (
@@ -429,7 +430,7 @@ export default function CryptoTab() {
                             {h.pd.manual ? (
                               <div style={{ fontSize: 10, color: "var(--muted)", fontStyle: "italic" }}>manual</div>
                             ) : h.pd.change24h != null && (
-                              <div style={{ fontSize: 11, color: h.pd.change24h >= 0 ? "#4ade80" : "#f87171" }}>
+                              <div style={{ fontSize: 11, color: h.pd.change24h >= 0 ? SEM.oa : SEM.danger }}>
                                 {h.pd.change24h >= 0 ? "▲" : "▼"} {Math.abs(h.pd.change24h).toFixed(2)}% 24h
                               </div>
                             )}
@@ -443,13 +444,13 @@ export default function CryptoTab() {
                       </td>
                       <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace" }}>{h.value !== null ? USD(h.value) : "—"}</td>
                       <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>
-                        {h.pnl !== null ? <span style={{ color: h.pnl >= 0 ? "#4ade80" : "#f87171" }}>{h.pnl >= 0 ? "+" : ""}{USD(h.pnl)}</span> : "—"}
+                        {h.pnl !== null ? <span style={{ color: h.pnl >= 0 ? SEM.oa : SEM.danger }}>{h.pnl >= 0 ? "+" : ""}{USD(h.pnl)}</span> : "—"}
                       </td>
                       <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>
-                        {h.pnlPct !== null ? <span style={{ color: h.pnlPct >= 0 ? "#4ade80" : "#f87171" }}>{h.pnlPct >= 0 ? "+" : ""}{h.pnlPct.toFixed(2)}%</span> : "—"}
+                        {h.pnlPct !== null ? <span style={{ color: h.pnlPct >= 0 ? SEM.oa : SEM.danger }}>{h.pnlPct >= 0 ? "+" : ""}{h.pnlPct.toFixed(2)}%</span> : "—"}
                       </td>
                       <td style={{ padding: "12px 14px" }}>
-                        <button onClick={() => delHolding(h.id)} style={{ color: "#f87171", background: "none", border: "none", cursor: "pointer", fontSize: 14, padding: "2px 8px" }}>✕</button>
+                        <button onClick={() => delHolding(h.id)} style={{ color: SEM.danger, background: "none", border: "none", cursor: "pointer", fontSize: 14, padding: "2px 8px" }}>✕</button>
                       </td>
                     </tr>
                   );
@@ -464,10 +465,10 @@ export default function CryptoTab() {
                     <td />
                     <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 700 }}>{priced.length ? USD(totalValue) : "—"}</td>
                     <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 800 }}>
-                      {priced.length ? <span style={{ color: totalPnl >= 0 ? "#4ade80" : "#f87171" }}>{totalPnl >= 0 ? "+" : ""}{USD(totalPnl)}</span> : "—"}
+                      {priced.length ? <span style={{ color: totalPnl >= 0 ? SEM.oa : SEM.danger }}>{totalPnl >= 0 ? "+" : ""}{USD(totalPnl)}</span> : "—"}
                     </td>
                     <td style={{ padding: "12px 14px", textAlign: "right", fontFamily: "'DM Mono', monospace", fontWeight: 800 }}>
-                      {totalPnlPct !== null ? <span style={{ color: totalPnlPct >= 0 ? "#4ade80" : "#f87171" }}>{totalPnlPct >= 0 ? "+" : ""}{totalPnlPct.toFixed(2)}%</span> : "—"}
+                      {totalPnlPct !== null ? <span style={{ color: totalPnlPct >= 0 ? SEM.oa : SEM.danger }}>{totalPnlPct >= 0 ? "+" : ""}{totalPnlPct.toFixed(2)}%</span> : "—"}
                     </td>
                     <td />
                   </tr>

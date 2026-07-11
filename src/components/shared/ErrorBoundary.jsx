@@ -1,4 +1,5 @@
 import { Component } from "react";
+import { SEM } from "../../theme.js";
 
 export class ErrorBoundary extends Component {
   constructor(props) {
@@ -20,7 +21,7 @@ export class ErrorBoundary extends Component {
         background: "rgba(239,68,68,0.06)",
         border: "1px solid rgba(239,68,68,0.2)",
       }}>
-        <div style={{ color: "#f87171", fontWeight: 700, marginBottom: 6, fontSize: 14 }}>
+        <div style={{ color: SEM.danger, fontWeight: 700, marginBottom: 6, fontSize: 14 }}>
           Something went wrong in this tab
         </div>
         <div style={{ fontSize: 12, color: "var(--muted)", marginBottom: 14, fontFamily: "monospace", lineHeight: 1.6 }}>

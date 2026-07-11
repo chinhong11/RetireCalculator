@@ -21,8 +21,10 @@ export function calcFd(fd) {
   const maturityValue = p + interest;
   let maturityDate = null;
   if (fd.startDate) {
-    const d = new Date(fd.startDate + "-01");
-    d.setMonth(d.getMonth() + t);
+    // Local-date construction: "YYYY-MM-01" string parsing is UTC and shifts
+    // a month early in negative-offset timezones.
+    const [yy, mm] = fd.startDate.split("-");
+    const d = new Date(Number(yy), Number(mm) - 1 + t, 1);
     maturityDate = d.toLocaleDateString("en-MY", { month: "short", year: "numeric" });
   }
   return { interest, maturityValue, maturityDate, effectiveAnnual: (r / 100) };

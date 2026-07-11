@@ -1,5 +1,6 @@
 import { useState, useRef } from "react";
 import { exportBackup, importBackup } from "../../lib/backup.js";
+import { SEM } from "../../theme.js";
 
 export function BackupBar() {
   const [status, setStatus] = useState(null);
@@ -36,8 +37,8 @@ export function BackupBar() {
         ↑ Restore
       </button>
       <input ref={fileRef} type="file" accept=".json" style={{ display: "none" }} onChange={handleImport} />
-      {status === "ok"  && <span style={{ fontSize: 11, color: "#4ade80", fontWeight: 600 }}>✓ Restored — reloading…</span>}
-      {status === "err" && <span style={{ fontSize: 11, color: "#f87171", fontWeight: 600 }}>✗ Invalid backup file</span>}
+      {status === "ok"  && <span style={{ fontSize: 11, color: SEM.oa, fontWeight: 600 }}>✓ Restored — reloading…</span>}
+      {status === "err" && <span style={{ fontSize: 11, color: SEM.danger, fontWeight: 600 }}>✗ Invalid backup file</span>}
     </div>
   );
 }

@@ -266,13 +266,33 @@ describe("RA formation at age 55", () => {
     expect(rows[1].oa).toBeLessThan(noRa[1].oa);
   });
 
-  it("when SA >= FRS no OA is transferred", () => {
-    // Give SA > FRS: only SA transferred, OA untouched
-    const richSA = { ...base55, saStart: 250_000, frs: CPF_FRS_2026 };
+  it("SA above the FRS spills to OA at formation; RA inflow is capped", () => {
+    // SA (250k → ~260k after interest) exceeds FRS: RA is seeded at the
+    // grown FRS and the SA excess is paid to OA (post-2025 SA closure rule),
+    // rather than RA absorbing the full SA.
+    const richSA = { ...base55, saStart: 250_000, frs: CPF_FRS_2026, frsGrowthRate: 0 };
     const rows = projectYears(richSA);
-    // OA should grow normally without a top-up deduction
-    const noRa = projectYears({ ...richSA, frs: 0 });
-    expect(rows[1].oa).toBe(noRa[1].oa);
+    const saAfterGrowth = richSA.saStart * (1 + richSA.saReturn / 100);
+    // RA = FRS + extra interest + capped contributions ≤ small margin over FRS
+    expect(rows[1].ra).toBeLessThan(saAfterGrowth);
+    // OA received the SA excess on top of its own growth
+    const noSpill = projectYears({ ...richSA, saStart: 100_000 });
+    expect(rows[1].oa).toBeGreaterThan(noSpill[1].oa);
+  });
+
+  it("post-55 RA contributions stop at the FRS and divert to OA", () => {
+    // RA already at FRS: the year's SA-allocation must land in OA, not RA
+    const rows = projectYears({
+      salary: 8000, age: 60, prYear: 3, annualIncrement: 0, yearsToProject: 1,
+      oaReturn: 0, saReturn: 0, maReturn: 0,
+      oaStart: 0, saStart: CPF_FRS_2026, maStart: 0,
+      frs: CPF_FRS_2026, frsGrowthRate: 0, bhsGrowthRate: 0,
+    });
+    const r1 = rows[1];
+    // RA gains only extra interest (≤ $900), never the contribution allocation
+    expect(r1.ra).toBeLessThanOrEqual(CPF_FRS_2026 + 900);
+    // OA holds its own allocation PLUS the diverted RA allocation
+    expect(r1.oa).toBeGreaterThan(0);
   });
 
   it("total is continuous across RA formation (no value disappears)", () => {
@@ -598,8 +618,10 @@ describe("estimateCpfLifePayout", () => {
   });
 
   it("larger RA produces higher monthly payout", () => {
-    const low  = projectYears({ ...baseProj, salary: 4000 });
-    const high = projectYears({ ...baseProj, salary: 8000 });
+    // With RA inflows capped at the FRS, differentiate via a short horizon
+    // where the low-salary projection has NOT yet filled RA to the cap.
+    const low  = projectYears({ ...baseProj, salary: 2000, yearsToProject: 16 });
+    const high = projectYears({ ...baseProj, salary: 8000, yearsToProject: 16 });
     const payLow  = estimateCpfLifePayout(low,  4);
     const payHigh = estimateCpfLifePayout(high, 4);
     expect(payHigh.monthlyPayout).toBeGreaterThan(payLow.monthlyPayout);
