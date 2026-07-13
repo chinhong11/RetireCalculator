@@ -259,7 +259,7 @@ export default function HousingLoanTab() {
 
       {/* Loan Summary Cards */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
-        <StatCard label="Purchase Price" value={RM(prop.purchasePrice)} color="#e8eaf0" />
+        <StatCard label="Purchase Price" value={RM(prop.purchasePrice)} color="var(--text)" />
         <StatCard label="Downpayment Paid" value={RM(totalDownpaid)} sub={prop.purchasePrice > 0 ? `${((totalDownpaid / prop.purchasePrice) * 100).toFixed(1)}% of price` : "—"} color="var(--accent)" />
         <StatCard label="Loan Amount" value={RM(loanAmount)} sub={prop.purchasePrice > 0 ? `${((loanAmount / prop.purchasePrice) * 100).toFixed(1)}% financing` : "—"} color="var(--accent2)" />
         <StatCard label="Monthly Installment" value={RM2(monthlyInstallment)} sub={`${prop.tenure}yr @ ${prop.interestRate}% p.a.`} color={SEM.ma} />
@@ -300,7 +300,7 @@ export default function HousingLoanTab() {
                   { label: "Total Principal", val: RM(amortTotalPrincipal), color: "var(--accent)" },
                   { label: "Total Interest", val: RM(amortTotalInterest), color: SEM.danger },
                   { label: "Interest / Loan", val: loanAmount > 0 ? `${((amortTotalInterest / loanAmount) * 100).toFixed(1)}%` : "—", color: SEM.warn },
-                  { label: "Total Cost", val: RM(amortTotalPrincipal + amortTotalInterest), color: "#e8eaf0" },
+                  { label: "Total Cost", val: RM(amortTotalPrincipal + amortTotalInterest), color: "var(--text)" },
                 ].map(({ label, val, color }) => (
                   <div key={label} style={{ flex: "1 1 120px", padding: "12px 16px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)" }}>
                     <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, marginBottom: 4 }}>{label}</div>
@@ -329,7 +329,7 @@ export default function HousingLoanTab() {
               </div>
 
               {/* Table */}
-              <div style={{ borderTop: "1px solid var(--border)", overflowX: "auto" }}>
+              <div className="x-scroll" style={{ borderTop: "1px solid var(--border)" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: "rgba(255,255,255,0.02)" }}>
@@ -394,7 +394,7 @@ export default function HousingLoanTab() {
           </div>
         </div>
         {(prop.downpaymentRecords || []).length > 0 ? (
-          <div style={{ overflowX: "auto" }}>
+          <div className="x-scroll">
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)" }}>
@@ -467,7 +467,7 @@ export default function HousingLoanTab() {
             </div>
           </div>
           {progressiveTimeline.length > 0 ? (
-            <div style={{ overflowX: "auto" }}>
+            <div className="x-scroll">
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid var(--border)" }}>
@@ -493,14 +493,15 @@ export default function HousingLoanTab() {
                     </tr>
                   ))}
                 </tbody>
-                <tfoot>
-                  <tr style={{ borderTop: "2px solid var(--border)" }}>
-                    <td colSpan={6} style={{ padding: "12px", fontWeight: 700, color: "var(--label)" }}>Est. Total Interest During Construction</td>
-                    <td style={{ padding: "12px", fontFamily: "'DM Mono', monospace", fontWeight: 800, color: SEM.ma, fontSize: 15 }}>{RM2(totalProgInterest)}</td>
-                    <td colSpan={2} />
-                  </tr>
-                </tfoot>
               </table>
+            </div>
+          ) : null}
+          {progressiveTimeline.length > 0 ? (
+            // Outside the scroll container so the headline total is always
+            // visible — in the tfoot it sat off-screen on narrow viewports.
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "12px 12px 0", borderTop: "2px solid var(--border)" }}>
+              <span style={{ fontWeight: 700, color: "var(--label)", fontSize: 13 }}>Est. Total Interest During Construction</span>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 800, color: SEM.ma, fontSize: 15 }}>{RM2(totalProgInterest)}</span>
             </div>
           ) : (
             <div style={{ textAlign: "center", padding: "28px", color: "var(--muted)", fontSize: 13 }}>

@@ -167,7 +167,11 @@ export default function SummaryTab({ cpfData, yearsToProject, projectionData }) 
         <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
           {[
             { label: "Ordinary Account (OA)", value: cpfOA, color: SEM.oa },
-            { label: "Special Account (SA)",  value: cpfSA, color: SEM.sa },
+            // After 55 the SA is closed and the RA holds retirement savings —
+            // showing "SA S$0" for a 55+ projection would look like a bug
+            cpfData?.raFormed
+              ? { label: "Retirement Account (RA)", value: cpfData?.ra || 0, color: SEM.ra }
+              : { label: "Special Account (SA)",    value: cpfSA,            color: SEM.sa },
             { label: "MediSave Account (MA)", value: cpfMA, color: SEM.ma },
           ].map(({ label, value, color }) => (
             <div key={label}>
@@ -196,7 +200,7 @@ export default function SummaryTab({ cpfData, yearsToProject, projectionData }) 
         />
         <div style={{ display: "flex", flexWrap: "wrap", gap: 10, marginBottom: properties.length ? 16 : 0 }}>
           {[
-            { label: "Total Property Value", value: RM(totalPropValue),   color: "#e8eaf0" },
+            { label: "Total Property Value", value: RM(totalPropValue),   color: "var(--text)" },
             { label: "Equity Paid",          value: RM(totalEquity),      color: "var(--accent)" },
             { label: "Outstanding Loan",     value: RM(totalOutstanding), color: SEM.danger },
           ].map(({ label, value, color }) => (

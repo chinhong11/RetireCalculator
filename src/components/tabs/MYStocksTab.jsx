@@ -128,7 +128,7 @@ export default function MYStocksTab() {
     <div>
       {/* Summary */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
-        <StatCard label="Total Invested" value={RM(totalCost)} sub="Cost basis incl. fees" color="#e8eaf0" />
+        <StatCard label="Total Invested" value={RM(totalCost)} sub="Cost basis incl. fees" color="var(--text)" />
         <StatCard
           label="Portfolio Value"
           value={priced.length ? RM(totalValue) : "—"}
@@ -207,7 +207,7 @@ export default function MYStocksTab() {
               <button style={exportBtnStyle} onClick={exportMyStocksPdf}>⎙ PDF</button>
             </div>
           </div>
-          <div style={{ overflowX: "auto" }}>
+          <div className="x-scroll">
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)" }}>

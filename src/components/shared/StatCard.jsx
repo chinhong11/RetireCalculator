@@ -8,8 +8,10 @@ export function StatCard({ label, value, sub, color }) {
         borderRadius: 14,
         padding: "18px 20px",
         border: "1px solid var(--border)",
-        flex: "1 1 0",
-        minWidth: 0,
+        // Grow to fit the value and wrap to the next row rather than clip —
+        // fixed flex-basis 0 + minWidth 0 truncated long values (RM 1,938.79)
+        flex: "1 1 150px",
+        minWidth: "fit-content",
         position: "relative",
         overflow: "hidden",
         transition: "transform 0.18s ease, box-shadow 0.18s ease",

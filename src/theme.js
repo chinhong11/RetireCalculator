@@ -104,6 +104,13 @@ export const GLOBAL_CSS = `
   .hl-in::placeholder { color: var(--muted); opacity: 0.55; }
   .hl-in option { background: var(--option-bg); color: var(--option-color); }
 
+  /* Horizontal-scroll wrappers for wide tables: a visible thin scrollbar is
+     the affordance that hidden columns exist (default overlay bars hide it) */
+  .x-scroll { overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--border) transparent; }
+  .x-scroll::-webkit-scrollbar { height: 6px; }
+  .x-scroll::-webkit-scrollbar-track { background: transparent; }
+  .x-scroll::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
   /* Sidebar scrollbar */
   .sidebar-scroll::-webkit-scrollbar { width: 3px; }
   .sidebar-scroll::-webkit-scrollbar-track { background: transparent; }

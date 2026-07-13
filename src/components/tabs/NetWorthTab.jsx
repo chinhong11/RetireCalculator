@@ -285,7 +285,7 @@ export default function NetWorthTab({ projectionData, yearsToProject }) {
 
       <div style={cardStyle}>
         <div style={{ fontSize: 12, color: "var(--label)", fontWeight: 600, marginBottom: 10 }}>Year-by-Year (SGD)</div>
-        <div style={{ overflowX: "auto" }}>
+        <div className="x-scroll">
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
               <tr style={{ color: "var(--muted)", borderBottom: "1px solid var(--border)" }}>
