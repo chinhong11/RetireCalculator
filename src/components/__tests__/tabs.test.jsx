@@ -13,15 +13,30 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 // ─── HousingLoanTab — user flows ──────────────────────────────────────────────
 
 describe("HousingLoanTab", () => {
-  it("renders the default property with its purchase price", () => {
+  // Most flows need a property first — created explicitly, never auto-injected
+  const renderWithProperty = () => {
+    const utils = render(<HousingLoanTab />);
+    fireEvent.click(screen.getByText("+ Add my first property"));
+    return utils;
+  };
+
+  it("first visit shows an empty state and persists NOTHING", () => {
     render(<HousingLoanTab />);
+    expect(screen.getByText(/Track a property purchase/i)).toBeInTheDocument();
+    // Regression: a phantom "My Property · RM 500,000" used to be silently
+    // saved here and then reported by the Summary tab as a real asset
+    expect(localStorage.getItem("hl_props_v1")).toBeNull();
+  });
+
+  it("adding the first property creates and persists it", () => {
+    renderWithProperty();
     expect(screen.getByText(/🏠 My Property/)).toBeInTheDocument();
-    // Default newProperty(): RM500k @ 4% over 35 years
     expect(screen.getByDisplayValue("500000")).toBeInTheDocument();
+    expect(JSON.parse(localStorage.getItem("hl_props_v1"))).toHaveLength(1);
   });
 
   it("shows a validation error when adding a downpayment with no date or amount", () => {
-    render(<HousingLoanTab />);
+    renderWithProperty();
     fireEvent.click(screen.getAllByText("+ Add")[0]); // downpayment Add button
     expect(screen.getByText(/Date and amount are required/i)).toBeInTheDocument();
   });
@@ -32,7 +47,7 @@ describe("HousingLoanTab", () => {
     [...container.querySelectorAll('input[type="date"]')].at(-1);
 
   it("adds a downpayment record and reduces the loan amount", () => {
-    const { container } = render(<HousingLoanTab />);
+    const { container } = renderWithProperty();
 
     const dateInput   = dpDateInput(container);
     const amountInput = screen.getByPlaceholderText("e.g. 50000");
@@ -48,7 +63,7 @@ describe("HousingLoanTab", () => {
   });
 
   it("persists records to localStorage", () => {
-    const { container } = render(<HousingLoanTab />);
+    const { container } = renderWithProperty();
     fireEvent.change(dpDateInput(container), { target: { value: "2026-02-01" } });
     fireEvent.change(screen.getByPlaceholderText("e.g. 50000"), { target: { value: "25000" } });
     fireEvent.click(screen.getAllByText("+ Add")[0]);
@@ -59,26 +74,25 @@ describe("HousingLoanTab", () => {
   });
 
   it("adds a second property via + Add Property", () => {
-    render(<HousingLoanTab />);
+    renderWithProperty();
     fireEvent.click(screen.getByText("+ Add Property"));
     expect(JSON.parse(localStorage.getItem("hl_props_v1"))).toHaveLength(2);
   });
 
   it("delete asks for confirmation and keeps the property when declined", () => {
     vi.spyOn(window, "confirm").mockReturnValue(false);
-    render(<HousingLoanTab />);
+    renderWithProperty();
     fireEvent.click(screen.getByText("Delete Property"));
     expect(window.confirm).toHaveBeenCalled();
     expect(screen.getByText(/🏠 My Property/)).toBeInTheDocument();
   });
 
-  it("deleting the last property replaces it with a fresh one", () => {
+  it("deleting the last property returns to the empty state and clears storage", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    render(<HousingLoanTab />);
+    renderWithProperty();
     fireEvent.click(screen.getByText("Delete Property"));
-    // Never left with zero properties
-    expect(JSON.parse(localStorage.getItem("hl_props_v1"))).toHaveLength(1);
-    expect(screen.getByText(/🏠 My Property/)).toBeInTheDocument();
+    expect(screen.getByText(/Track a property purchase/i)).toBeInTheDocument();
+    expect(localStorage.getItem("hl_props_v1")).toBeNull();
   });
 });
 

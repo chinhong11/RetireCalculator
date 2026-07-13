@@ -11,12 +11,15 @@ const safeFloat = (val, max = 1e9) => { const n = parseFloat(val); return isFini
 const safeInt   = (val, max = 1e6) => { const n = parseInt(val, 10); return isFinite(n) ? Math.min(Math.max(0, n), max) : 0; };
 
 export default function HousingLoanTab() {
+  // Start EMPTY on first visit. Auto-creating a default property silently
+  // persisted a phantom "My Property · RM 500,000" that the Summary tab then
+  // reported as the user's real asset.
   const [properties, setProperties] = useState(() => {
     try {
       const s = localStorage.getItem("hl_props_v1");
-      if (s) { const p = JSON.parse(s); if (Array.isArray(p) && p.length) return p; }
+      if (s) { const p = JSON.parse(s); if (Array.isArray(p)) return p; }
     } catch {}
-    return [newProperty()];
+    return [];
   });
 
   const [selId, setSelId] = useState(() => {
@@ -31,7 +34,13 @@ export default function HousingLoanTab() {
   const [amortYear, setAmortYear] = useState(1);
 
   useEffect(() => {
-    try { localStorage.setItem("hl_props_v1", JSON.stringify(properties)); notifyPersist(); } catch {}
+    try {
+      // Don't write an empty list on first visit — its mere presence makes
+      // other tabs (and the backup nudge) believe the user has entered data
+      if (properties.length) localStorage.setItem("hl_props_v1", JSON.stringify(properties));
+      else localStorage.removeItem("hl_props_v1");
+      notifyPersist();
+    } catch {}
   }, [properties]);
 
   useEffect(() => {
@@ -52,9 +61,8 @@ export default function HousingLoanTab() {
   const delProp = () => {
     if (!window.confirm(`Delete "${prop?.name}"? This cannot be undone.`)) return;
     const next = properties.filter(p => p.id !== effectiveId);
-    const fallback = next.length ? next : [newProperty()];
-    setProperties(fallback);
-    setSelId(fallback[0].id);
+    setProperties(next);
+    setSelId(next[0]?.id ?? null);
   };
 
   const addDP = () => {
@@ -102,7 +110,31 @@ export default function HousingLoanTab() {
   const amortYearInterest = amortYearRows.reduce((s, r) => s + r.interest, 0);
   const amortYearPrincipal = amortYearRows.reduce((s, r) => s + r.principal, 0);
 
-  if (!prop) return null;
+  // Empty state: no property yet — invite instead of auto-creating one
+  if (!prop) {
+    return (
+      <div style={{
+        background: "var(--card-bg)", borderRadius: 16, border: "1px solid var(--border)",
+        padding: "56px 24px", textAlign: "center",
+      }}>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>🏠</div>
+        <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-0.01em", marginBottom: 8 }}>
+          Track a property purchase
+        </div>
+        <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.7, maxWidth: 440, margin: "0 auto 24px" }}>
+          Record your downpayments, see the full loan amortization schedule, and — for
+          under-construction properties — estimate progressive interest before handover.
+        </div>
+        <button onClick={addProp} style={{
+          padding: "12px 24px", borderRadius: 10, border: "none",
+          background: "var(--accent)", color: "#0a0e17", fontWeight: 700, fontSize: 14,
+          cursor: "pointer", fontFamily: "inherit",
+        }}>
+          + Add my first property
+        </button>
+      </div>
+    );
+  }
 
   const exportHousingCsv = () => {
     const summaryRows = properties.map(p => {

@@ -27,8 +27,11 @@ test.describe("app smoke", () => {
     await salaryInput.fill("8000");
     await expect(contribCell).not.toHaveText(before);
 
-    // Lazy-loaded tabs render on demand: Housing Loan
+    // Lazy-loaded tabs render on demand: Housing Loan starts with an empty
+    // state (no phantom property) and creates one on request
     await page.getByRole("tab", { name: /Housing Loan/ }).click();
+    await expect(page.getByText(/Track a property purchase/i)).toBeVisible();
+    await page.getByRole("button", { name: /Add my first property/ }).click();
     await expect(page.getByText("Property Details")).toBeVisible();
 
     // Growth Chart tab pulls in the Recharts chunk and renders an SVG chart
