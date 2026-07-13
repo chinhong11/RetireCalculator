@@ -19,6 +19,14 @@ import SummaryTab from "../tabs/SummaryTab.jsx";
 import { QuickStart } from "../shared/QuickStart.jsx";
 import { MoneyInput } from "../shared/MoneyInput.jsx";
 import { ScenarioCompare } from "../shared/ScenarioCompare.jsx";
+import EPFTab from "../tabs/EPFTab.jsx";
+import FireTab from "../tabs/FireTab.jsx";
+import NetWorthTab from "../tabs/NetWorthTab.jsx";
+
+// Keep NetWorthTab's mount-time FX fetch off the network in tests
+vi.mock("../../lib/fetchFx.js", () => ({
+  fetchFxRates: () => Promise.resolve({ usdToSgd: 1.35, myrToSgd: 0.30, fromCache: true }),
+}));
 
 beforeEach(() => localStorage.clear());
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -239,6 +247,68 @@ describe("MoneyInput", () => {
   it("uses the numeric mobile keypad", () => {
     render(<MoneyInput value={0} onChange={() => {}} placeholder="amount" />);
     expect(screen.getByPlaceholderText("amount")).toHaveAttribute("inputmode", "numeric");
+  });
+});
+
+// ─── EPF / FIRE / Net Worth tabs — render + key figures ───────────────────────
+
+describe("EPFTab", () => {
+  it("renders inputs and a projected total from the default wage", () => {
+    render(<EPFTab />);
+    expect(screen.getByText(/Monthly Gross Wage/)).toBeInTheDocument();
+    // Default RM5,000 wage over 30 years produces a substantial RM total
+    expect(screen.getAllByText(/RM /).length).toBeGreaterThan(3);
+  });
+
+  it("dividend preset chips set the rate", () => {
+    render(<EPFTab />);
+    fireEvent.click(screen.getByText(/10-yr avg/));
+    expect(screen.getByDisplayValue("5.7")).toBeInTheDocument();
+    fireEvent.click(screen.getByText(/Shariah/));
+    expect(screen.getByDisplayValue("5.3")).toBeInTheDocument();
+  });
+});
+
+describe("FireTab", () => {
+  const projectionData = [
+    { year: 0, age: 35, total: 50_000 },
+    { year: 1, age: 36, total: 120_000 },
+    { year: 2, age: 37, total: 1_000_000 },
+  ];
+
+  it("computes the FIRE number from expenses and withdrawal rate", () => {
+    render(<FireTab projectionData={projectionData} yearsToProject={2} />);
+    // Default: S$3,000/mo × 12 ÷ 4% = S$900k (hero + stat + sensitivity row)
+    expect(screen.getAllByText("S$900k").length).toBeGreaterThanOrEqual(1);
+    expect(screen.getByText(/YOUR FIRE NUMBER/i)).toBeInTheDocument();
+  });
+
+  it("reports the crossover age when the projection passes the target", () => {
+    const { container } = render(<FireTab projectionData={projectionData} yearsToProject={2} />);
+    // Year 2 total (1M) exceeds the 900k target → crossover at age 37
+    expect(container.textContent).toMatch(/FIRE CROSSOVER/i);
+    expect(container.textContent).toMatch(/Age\s*37/);
+  });
+});
+
+describe("NetWorthTab", () => {
+  const projectionData = [
+    { year: 0, age: 35, total: 50_000 },
+    { year: 1, age: 36, total: 120_000 },
+  ];
+
+  it("renders FX controls and the CPF series", () => {
+    const { container } = render(<NetWorthTab projectionData={projectionData} yearsToProject={1} />);
+    expect(screen.getByText(/FX Rates \(to SGD\)/)).toBeInTheDocument();
+    expect(container.textContent).toMatch(/CPF \(SGD\)/);
+  });
+
+  it("typing an FX rate marks rates as manual", () => {
+    render(<NetWorthTab projectionData={projectionData} yearsToProject={1} />);
+    const usdInput = screen.getByDisplayValue("1.35");
+    fireEvent.change(usdInput, { target: { value: "1.40" } });
+    expect(screen.getByText(/manual rates/)).toBeInTheDocument();
+    expect(localStorage.getItem("fx_manual")).toBe("true");
   });
 });
 
