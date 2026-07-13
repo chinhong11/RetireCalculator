@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { fmtD } from "../../lib/cpf.js";
+import { MoneyInput } from "./MoneyInput.jsx";
 
 /**
  * First-run 3-question setup. Collects the only inputs the core CPF
@@ -14,13 +15,13 @@ import { fmtD } from "../../lib/cpf.js";
  * }} props
  */
 export function QuickStart({ initialSalary, initialAge, initialPrYear, monthlyContrib, onComplete, onClose }) {
-  const [salary, setSalary] = useState(initialSalary || "");
+  const [salary, setSalary] = useState(initialSalary || 0);
   const [age, setAge]       = useState(initialAge || 30);
   const [prYear, setPrYear] = useState(initialPrYear || 1);
   const [done, setDone]     = useState(false);
 
   const submit = () => {
-    onComplete({ salary: Math.max(0, parseInt(salary) || 0), age, prYear });
+    onComplete({ salary, age, prYear });
     setDone(true);
   };
 
@@ -55,9 +56,9 @@ export function QuickStart({ initialSalary, initialAge, initialPrYear, monthlyCo
             </div>
 
             <label style={labelStyle}>1 · Monthly salary (SGD)</label>
-            <input
-              type="number" className="input-field" autoFocus value={salary} min={0} step={100}
-              placeholder="e.g. 5000" onChange={e => setSalary(e.target.value)}
+            <MoneyInput
+              className="input-field" autoFocus value={salary} max={1_000_000}
+              placeholder="e.g. 5,000" onChange={setSalary}
               onKeyDown={e => e.key === "Enter" && salary && submit()}
               style={{ marginBottom: 18 }}
             />

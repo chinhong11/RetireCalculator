@@ -5,6 +5,7 @@ import { toCsv, downloadBlob, printTable } from "../../lib/backup.js";
 import { notifyPersist } from "../../lib/usePersistedState.js";
 import { StatCard } from "../shared/StatCard.jsx";
 import { LabelField } from "../shared/LabelField.jsx";
+import { MoneyInput } from "../shared/MoneyInput.jsx";
 import { SEM } from "../../theme.js";
 
 const safeFloat = (val, max = 1e9) => { const n = parseFloat(val); return isFinite(n) ? Math.min(Math.max(0, n), max) : 0; };
@@ -26,9 +27,9 @@ export default function HousingLoanTab() {
     try { return localStorage.getItem("hl_selid_v1") || null; } catch { return null; }
   });
 
-  const [dpForm, setDpForm] = useState({ date: "", amount: "", note: "" });
+  const [dpForm, setDpForm] = useState({ date: "", amount: 0, note: "" });
   const [dpError, setDpError] = useState("");
-  const [prForm, setPrForm] = useState({ month: "", claimAmount: "", stage: "", note: "" });
+  const [prForm, setPrForm] = useState({ month: "", claimAmount: 0, stage: "", note: "" });
   const [prError, setPrError] = useState("");
   const [showAmort, setShowAmort] = useState(false);
   const [amortYear, setAmortYear] = useState(1);
@@ -73,7 +74,7 @@ export default function HousingLoanTab() {
     setDpError("");
     const rec = { id: uid(), date: dpForm.date, amount: safeFloat(dpForm.amount), note: dpForm.note.trim() };
     upd({ downpaymentRecords: [...(prop.downpaymentRecords || []), rec].sort((a, b) => a.date.localeCompare(b.date)) });
-    setDpForm({ date: "", amount: "", note: "" });
+    setDpForm({ date: "", amount: 0, note: "" });
   };
 
   const delDP = (recId) => prop && upd({ downpaymentRecords: (prop.downpaymentRecords || []).filter(r => r.id !== recId) });
@@ -90,7 +91,7 @@ export default function HousingLoanTab() {
     setPrError("");
     const rec = { id: uid(), month: prForm.month, claimAmount: safeFloat(prForm.claimAmount), stage: prForm.stage.trim(), note: prForm.note.trim() };
     upd({ progressiveRecords: [...(prop.progressiveRecords || []), rec].sort((a, b) => a.month.localeCompare(b.month)) });
-    setPrForm({ month: "", claimAmount: "", stage: "", note: "" });
+    setPrForm({ month: "", claimAmount: 0, stage: "", note: "" });
   };
 
   const delPR = (recId) => prop && upd({ progressiveRecords: (prop.progressiveRecords || []).filter(r => r.id !== recId) });
@@ -265,7 +266,7 @@ export default function HousingLoanTab() {
             </select>
           </LabelField>
           <LabelField label="Purchase Price (RM)">
-            <input className="hl-in" type="number" value={prop.purchasePrice} onChange={e => upd({ purchasePrice: safeFloat(e.target.value, 1e9) })} min={0} step={1000} style={{ fontFamily: "'DM Mono', monospace" }} />
+            <MoneyInput className="hl-in" value={prop.purchasePrice} max={1e9} onChange={v => upd({ purchasePrice: v })} style={{ fontFamily: "'DM Mono', monospace" }} />
           </LabelField>
           <LabelField label="Interest Rate (% p.a.)">
             <input className="hl-in" type="number" value={prop.interestRate} onChange={e => upd({ interestRate: safeFloat(e.target.value, 20) })} min={0} max={20} step={0.05} style={{ fontFamily: "'DM Mono', monospace" }} />
@@ -414,7 +415,7 @@ export default function HousingLoanTab() {
           </div>
           <div style={{ flex: "1 1 140px" }}>
             <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Amount (RM)</label>
-            <input className="hl-in" type="number" placeholder="e.g. 50000" value={dpForm.amount} onChange={e => setDpForm(f => ({ ...f, amount: e.target.value }))} min={0} step={100} style={{ fontFamily: "'DM Mono', monospace" }} />
+            <MoneyInput className="hl-in" placeholder="e.g. 50,000" value={dpForm.amount} max={1e9} onChange={v => setDpForm(f => ({ ...f, amount: v }))} style={{ fontFamily: "'DM Mono', monospace" }} />
           </div>
           <div style={{ flex: "2 1 200px" }}>
             <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Note</label>
@@ -483,7 +484,7 @@ export default function HousingLoanTab() {
             </div>
             <div style={{ flex: "1 1 140px" }}>
               <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Claim Amount (RM)</label>
-              <input className="hl-in" type="number" placeholder="Amount disbursed" value={prForm.claimAmount} onChange={e => setPrForm(f => ({ ...f, claimAmount: e.target.value }))} min={0} step={1000} style={{ fontFamily: "'DM Mono', monospace" }} />
+              <MoneyInput className="hl-in" placeholder="Amount disbursed" value={prForm.claimAmount} max={1e9} onChange={v => setPrForm(f => ({ ...f, claimAmount: v }))} style={{ fontFamily: "'DM Mono', monospace" }} />
             </div>
             <div style={{ flex: "2 1 180px" }}>
               <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Construction Stage</label>

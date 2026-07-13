@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { calcFd, FD_EMPTY } from "../../lib/finance.js";
 import { downloadBlob, toCsv } from "../../lib/backup.js";
 import { usePersistedState } from "../../lib/usePersistedState.js";
+import { MoneyInput } from "../shared/MoneyInput.jsx";
 import { SEM } from "../../theme.js";
 
 export default function FixedDepositsTab() {
@@ -103,7 +104,7 @@ export default function FixedDepositsTab() {
             </div>
             <div>
               <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>Principal (RM) *</div>
-              <input type="number" min={0} placeholder="50000" value={form.principal} onChange={e => setForm(f => ({ ...f, principal: e.target.value }))} style={inputStyle} />
+              <MoneyInput placeholder="50,000" value={parseFloat(form.principal) || 0} max={1e8} onChange={v => setForm(f => ({ ...f, principal: v ? String(v) : "" }))} style={inputStyle} />
             </div>
             <div>
               <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>Interest Rate (% p.a.) *</div>

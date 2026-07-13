@@ -1,11 +1,13 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { useState } from "react";
 import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 
 import HousingLoanTab from "../tabs/HousingLoanTab.jsx";
 import SummaryTab from "../tabs/SummaryTab.jsx";
 import { QuickStart } from "../shared/QuickStart.jsx";
+import { MoneyInput } from "../shared/MoneyInput.jsx";
 
 beforeEach(() => localStorage.clear());
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -31,7 +33,7 @@ describe("HousingLoanTab", () => {
   it("adding the first property creates and persists it", () => {
     renderWithProperty();
     expect(screen.getByText(/🏠 My Property/)).toBeInTheDocument();
-    expect(screen.getByDisplayValue("500000")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("500,000")).toBeInTheDocument(); // MoneyInput formats live
     expect(JSON.parse(localStorage.getItem("hl_props_v1"))).toHaveLength(1);
   });
 
@@ -50,7 +52,7 @@ describe("HousingLoanTab", () => {
     const { container } = renderWithProperty();
 
     const dateInput   = dpDateInput(container);
-    const amountInput = screen.getByPlaceholderText("e.g. 50000");
+    const amountInput = screen.getByPlaceholderText("e.g. 50,000");
     fireEvent.change(dateInput,   { target: { value: "2026-01-15" } });
     fireEvent.change(amountInput, { target: { value: "50000" } });
     fireEvent.click(screen.getAllByText("+ Add")[0]);
@@ -65,7 +67,7 @@ describe("HousingLoanTab", () => {
   it("persists records to localStorage", () => {
     const { container } = renderWithProperty();
     fireEvent.change(dpDateInput(container), { target: { value: "2026-02-01" } });
-    fireEvent.change(screen.getByPlaceholderText("e.g. 50000"), { target: { value: "25000" } });
+    fireEvent.change(screen.getByPlaceholderText("e.g. 50,000"), { target: { value: "25000" } });
     fireEvent.click(screen.getAllByText("+ Add")[0]);
 
     const stored = JSON.parse(localStorage.getItem("hl_props_v1"));
@@ -186,6 +188,49 @@ describe("SummaryTab", () => {
   });
 });
 
+// ─── MoneyInput — live thousands separators ───────────────────────────────────
+
+describe("MoneyInput", () => {
+  function Harness({ initial = 0 }) {
+    const [v, setV] = useState(initial);
+    return <MoneyInput value={v} onChange={setV} placeholder="amount" />;
+  }
+
+  it("formats typed digits with thousands separators", () => {
+    render(<Harness />);
+    const input = screen.getByPlaceholderText("amount");
+    fireEvent.change(input, { target: { value: "480000" } });
+    expect(input).toHaveValue("480,000");
+  });
+
+  it("emits a plain integer, stripping any pasted separators/garbage", () => {
+    const onChange = vi.fn();
+    render(<MoneyInput value={0} onChange={onChange} placeholder="amount" />);
+    fireEvent.change(screen.getByPlaceholderText("amount"), { target: { value: "RM 1,234,567" } });
+    expect(onChange).toHaveBeenCalledWith(1234567);
+  });
+
+  it("clearing the field emits 0 and shows the placeholder", () => {
+    render(<Harness initial={5000} />);
+    const input = screen.getByPlaceholderText("amount");
+    expect(input).toHaveValue("5,000");
+    fireEvent.change(input, { target: { value: "" } });
+    expect(input).toHaveValue("");
+  });
+
+  it("clamps to max", () => {
+    const onChange = vi.fn();
+    render(<MoneyInput value={0} onChange={onChange} max={1000} placeholder="amount" />);
+    fireEvent.change(screen.getByPlaceholderText("amount"), { target: { value: "99999" } });
+    expect(onChange).toHaveBeenCalledWith(1000);
+  });
+
+  it("uses the numeric mobile keypad", () => {
+    render(<MoneyInput value={0} onChange={() => {}} placeholder="amount" />);
+    expect(screen.getByPlaceholderText("amount")).toHaveAttribute("inputmode", "numeric");
+  });
+});
+
 // ─── QuickStart — first-run onboarding ────────────────────────────────────────
 
 describe("QuickStart", () => {
@@ -206,7 +251,7 @@ describe("QuickStart", () => {
 
   it("submitting fires onComplete with entered values and shows the ready screen", () => {
     const { onComplete } = setup();
-    fireEvent.change(screen.getByPlaceholderText("e.g. 5000"), { target: { value: "7000" } });
+    fireEvent.change(screen.getByPlaceholderText("e.g. 5,000"), { target: { value: "7000" } });
     fireEvent.click(screen.getByRole("button", { name: /See my projection/ }));
     expect(onComplete).toHaveBeenCalledWith({ salary: 7000, age: 30, prYear: 1 });
     expect(screen.getByText(/Your CPF projection is ready/i)).toBeInTheDocument();
@@ -214,7 +259,7 @@ describe("QuickStart", () => {
 
   it("the ready screen closes as completed", () => {
     const { onClose } = setup();
-    fireEvent.change(screen.getByPlaceholderText("e.g. 5000"), { target: { value: "7000" } });
+    fireEvent.change(screen.getByPlaceholderText("e.g. 5,000"), { target: { value: "7000" } });
     fireEvent.click(screen.getByRole("button", { name: /See my projection/ }));
     fireEvent.click(screen.getByRole("button", { name: /Explore my projection/ }));
     expect(onClose).toHaveBeenCalledWith(true);

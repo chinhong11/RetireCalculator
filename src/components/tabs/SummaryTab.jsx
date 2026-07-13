@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { RM, USD, uid } from "../../lib/finance.js";
 import { totalDownpayment } from "../../lib/housing.js";
 import { usePersistedState } from "../../lib/usePersistedState.js";
+import { MoneyInput } from "../shared/MoneyInput.jsx";
 import { SEM } from "../../theme.js";
 
 function lsJson(key) {
@@ -321,11 +322,10 @@ export default function SummaryTab({ cpfData, yearsToProject, projectionData }) 
               <option value="MYR">MYR</option>
               <option value="USD">USD</option>
             </select>
-            <input
-              type="number"
+            <MoneyInput
               placeholder="Target amount"
-              value={goalForm.target}
-              onChange={e => setGoalForm(f => ({ ...f, target: e.target.value }))}
+              value={goalForm.target || 0} max={1e9}
+              onChange={v => setGoalForm(f => ({ ...f, target: v }))}
               className="hl-in"
               style={{ flex: "1 1 150px", fontFamily: "'DM Mono', monospace" }}
             />

@@ -2,6 +2,7 @@ import { useState, useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { EPF_PER, EPF_SEJ, EPF_FLK, computeEpfMonthly, projectEpfYears } from "../../lib/epf.js";
 import { usePersistedState } from "../../lib/usePersistedState.js";
+import { MoneyInput } from "../shared/MoneyInput.jsx";
 
 export default function EPFTab() {
   const [wage, setWage]                       = usePersistedState("epf_wage",       5000);
@@ -49,7 +50,7 @@ export default function EPFTab() {
       <div style={{ ...cardStyle, display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
         <div>
           <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>Monthly Gross Wage (RM)</div>
-          <input type="number" min={0} value={wage} onChange={e => setWage(parseFloat(e.target.value) || 0)} style={inputStyle} />
+          <MoneyInput value={wage} max={1_000_000} onChange={setWage} style={inputStyle} />
         </div>
         <div>
           <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>Current Age</div>
@@ -75,15 +76,15 @@ export default function EPFTab() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
           <div>
             <div style={{ fontSize: 11, color: EPF_PER, marginBottom: 4 }}>Akaun Persaraan (RM)</div>
-            <input type="number" min={0} value={startPer} onChange={e => setStartPer(parseFloat(e.target.value) || 0)} style={inputStyle} />
+            <MoneyInput value={startPer} max={1e8} onChange={setStartPer} style={inputStyle} />
           </div>
           <div>
             <div style={{ fontSize: 11, color: EPF_SEJ, marginBottom: 4 }}>Akaun Sejahtera (RM)</div>
-            <input type="number" min={0} value={startSej} onChange={e => setStartSej(parseFloat(e.target.value) || 0)} style={inputStyle} />
+            <MoneyInput value={startSej} max={1e8} onChange={setStartSej} style={inputStyle} />
           </div>
           <div>
             <div style={{ fontSize: 11, color: EPF_FLK, marginBottom: 4 }}>Akaun Fleksibel (RM)</div>
-            <input type="number" min={0} value={startFlek} onChange={e => setStartFlek(parseFloat(e.target.value) || 0)} style={inputStyle} />
+            <MoneyInput value={startFlek} max={1e8} onChange={setStartFlek} style={inputStyle} />
           </div>
         </div>
       </div>

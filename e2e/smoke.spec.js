@@ -21,7 +21,7 @@ test.describe("app smoke", () => {
     await expect(page.getByText(/Total CPF · \d+ yr/)).toBeVisible();
 
     // Changing the salary in the sidebar updates the monthly contribution figure
-    const salaryInput = page.getByPlaceholder("e.g. 5000");
+    const salaryInput = page.getByPlaceholder("e.g. 5,000");
     const contribCell = page.getByText("CPF Contribution / mo").locator("..");
     const before = await contribCell.textContent();
     await salaryInput.fill("8000");
@@ -38,8 +38,9 @@ test.describe("app smoke", () => {
     await page.getByRole("tab", { name: /Growth Chart/ }).click();
     await expect(page.locator(".recharts-surface").first()).toBeVisible();
 
-    // Inputs persist across reload (localStorage round-trip in a real browser)
+    // Inputs persist across reload (localStorage round-trip in a real browser);
+    // MoneyInput renders the stored 8000 with a thousands separator
     await page.reload();
-    await expect(page.getByPlaceholder("e.g. 5000")).toHaveValue("8000");
+    await expect(page.getByPlaceholder("e.g. 5,000")).toHaveValue("8,000");
   });
 });
