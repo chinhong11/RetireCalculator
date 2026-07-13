@@ -2,7 +2,7 @@ import { defineConfig } from "@playwright/test";
 
 export default defineConfig({
   testDir: "e2e",
-  timeout: 30_000,
+  timeout: 60_000,
   use: {
     baseURL: "http://localhost:4173",
     // The sandbox pre-installs Chromium at a fixed path; fall back to the

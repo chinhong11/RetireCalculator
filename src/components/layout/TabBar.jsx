@@ -46,7 +46,7 @@ export function TabBar({ activeTab, setActiveTab }) {
       <div aria-hidden="true" style={{ display: "flex", alignItems: "center", gap: 8, margin: "6px 2px" }}>
         <div style={{ height: 1, flex: 1, background: "var(--border)" }} />
         <span style={{ fontSize: 9, fontWeight: 700, textTransform: "uppercase", letterSpacing: "0.12em", color: "var(--muted)", whiteSpace: "nowrap" }}>
-          Assets &amp; Planning
+          Assets &amp; Planning · optional
         </span>
         <div style={{ height: 1, flex: 1, background: "var(--border)" }} />
       </div>

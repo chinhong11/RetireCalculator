@@ -12,6 +12,7 @@ import { TabBar }  from "./components/layout/TabBar.jsx";
 import { ErrorBoundary }   from "./components/shared/ErrorBoundary.jsx";
 import { CpfSummaryCards } from "./components/shared/CpfSummaryCards.jsx";
 import { AuthModal }       from "./components/shared/AuthModal.jsx";
+import { QuickStart }      from "./components/shared/QuickStart.jsx";
 
 // Tabs are lazy so Recharts/heavy tab code loads on demand instead of
 // blocking first paint. (exportPdf — and jsPDF with it — is dynamically
@@ -67,14 +68,34 @@ export default function CPFCalculator() {
   const [pdfBusy, setPdfBusy]       = useState(false);
   const [pdfError, setPdfError]     = useState(null);
   const [advancedOpen, setAdvancedOpen] = useState(false);
-  // Show a first-run banner until the user changes salary (key not in storage yet)
-  const [showWelcome, setShowWelcome] = useState(() => !localStorage.getItem("cpf_salary"));
+  // First run = the salary key has never been written. Show the quick-start
+  // modal; the lighter welcome banner only appears if it's skipped.
+  const [firstRun] = useState(() => !localStorage.getItem("cpf_salary"));
+  const [showQuickStart, setShowQuickStart] = useState(firstRun);
+  const [showWelcome, setShowWelcome] = useState(false);
   const [showAuthModal, setShowAuthModal] = useState(false);
+  const [backupNudgeDismissed, setBackupNudgeDismissed] =
+    useState(() => localStorage.getItem("backup_nudge_dismissed") === "true");
 
   // ─── Cloud sync ─────────────────────────────────────────────────────────
   // Outbound pushes are driven by the persist event that usePersistedState
   // dispatches on every localStorage write — edits in any tab sync.
   const { user, syncing, syncError, signOut } = useCloudSync();
+
+  // Nudge un-signed-in users to protect data once they've entered real
+  // records — everything lives in this browser until they back up / sign in.
+  const hasPortfolioData = useMemo(() => {
+    const collections = ["hl_props_v1", "stocks_v1", "mystocks_v1", "crypto_v1", "fd_v1", "goals_v1", "sav_expenses_v1"];
+    return collections.some(k => {
+      try { const v = JSON.parse(localStorage.getItem(k) || "[]"); return Array.isArray(v) && v.length > 0; }
+      catch { return false; }
+    });
+  }, [activeTab]); // re-check on tab switch (tabs write these keys)
+  const showBackupNudge = !user && !backupNudgeDismissed && hasPortfolioData;
+  const dismissBackupNudge = () => {
+    setBackupNudgeDismissed(true);
+    try { localStorage.setItem("backup_nudge_dismissed", "true"); } catch {}
+  };
 
   // ─── Derived data ────────────────────────────────────────────────────────
   const effectiveSaShield = age < 55 && saShieldOn ? saShield : 0;
@@ -178,15 +199,42 @@ export default function CPFCalculator() {
             {/* First-run welcome banner */}
             {showWelcome && (
               <div style={{
-                display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-                marginBottom: 10, padding: "10px 16px", borderRadius: 10,
+                display: "flex", alignItems: "flex-start", justifyContent: "space-between", gap: 12,
+                marginBottom: 10, padding: "12px 16px", borderRadius: 10,
                 background: "var(--accent-subtle)", border: "1px solid var(--accent-border-c)",
-                fontSize: 12, color: "var(--label)", lineHeight: 1.5,
+                fontSize: 12, color: "var(--label)", lineHeight: 1.6,
               }}>
-                <span>👆 These are example values — enter your salary and age in the sidebar to personalise your projection.</span>
+                <span>
+                  <strong style={{ color: "var(--text)" }}>👋 Welcome!</strong> These are example figures.
+                  <strong style={{ color: "var(--accent)" }}> Step 1:</strong> enter your salary &amp; age in the sidebar to see your personal CPF projection.
+                  <strong style={{ color: "var(--accent)" }}> Step 2 (optional):</strong> the tabs above track extra assets — stocks, property, EPF, FIRE — add only what you want.
+                </span>
                 <button onClick={() => setShowWelcome(false)}
                   style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--muted)", fontSize: 18, lineHeight: 1, padding: 0, flexShrink: 0 }}
                   aria-label="Dismiss">×</button>
+              </div>
+            )}
+
+            {/* Data-safety nudge — data lives only in this browser until saved */}
+            {showBackupNudge && (
+              <div style={{
+                display: "flex", alignItems: "center", gap: 12, flexWrap: "wrap",
+                marginBottom: 10, padding: "10px 16px", borderRadius: 10,
+                background: "rgba(251,191,36,0.08)", border: "1px solid rgba(251,191,36,0.3)",
+                fontSize: 12, color: "var(--label)", lineHeight: 1.5,
+              }}>
+                <span style={{ flex: "1 1 300px" }}>
+                  💾 Your data is saved only in this browser. <strong style={{ color: "var(--text)" }}>Sign in</strong> to sync it to the cloud, or export a backup — clearing your browser would otherwise erase it.
+                </span>
+                <div style={{ display: "flex", gap: 8, flexShrink: 0 }}>
+                  <button onClick={() => setShowAuthModal(true)}
+                    style={{ background: "var(--accent-chip)", border: "1px solid var(--accent-border-c)", borderRadius: 8, padding: "5px 12px", cursor: "pointer", fontSize: 12, fontWeight: 600, color: "var(--accent)", fontFamily: "inherit" }}>
+                    ☁ Sign in
+                  </button>
+                  <button onClick={dismissBackupNudge}
+                    style={{ background: "transparent", border: "none", cursor: "pointer", color: "var(--muted)", fontSize: 18, lineHeight: 1, padding: 0 }}
+                    aria-label="Dismiss">×</button>
+                </div>
               </div>
             )}
 
@@ -298,6 +346,16 @@ export default function CPFCalculator() {
         </div>
 
       </div>
+
+      {/* ── First-run quick start ───────────────────────────────────────── */}
+      {showQuickStart && (
+        <QuickStart
+          initialSalary={salary} initialAge={age} initialPrYear={prYear}
+          monthlyContrib={monthly.totalContrib}
+          onComplete={({ salary: s, age: a, prYear: p }) => { setSalary(s); setAge(a); setPrYear(p); }}
+          onClose={(completed) => { setShowQuickStart(false); if (!completed) setShowWelcome(true); }}
+        />
+      )}
 
       {/* ── Auth modal ──────────────────────────────────────────────────── */}
       {showAuthModal && (

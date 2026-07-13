@@ -1,10 +1,13 @@
 // @vitest-environment jsdom
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { useState } from "react";
 import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 
 import HousingLoanTab from "../tabs/HousingLoanTab.jsx";
 import SummaryTab from "../tabs/SummaryTab.jsx";
+import { QuickStart } from "../shared/QuickStart.jsx";
+import { MoneyInput } from "../shared/MoneyInput.jsx";
 
 beforeEach(() => localStorage.clear());
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -12,15 +15,30 @@ afterEach(() => { cleanup(); vi.restoreAllMocks(); });
 // ─── HousingLoanTab — user flows ──────────────────────────────────────────────
 
 describe("HousingLoanTab", () => {
-  it("renders the default property with its purchase price", () => {
+  // Most flows need a property first — created explicitly, never auto-injected
+  const renderWithProperty = () => {
+    const utils = render(<HousingLoanTab />);
+    fireEvent.click(screen.getByText("+ Add my first property"));
+    return utils;
+  };
+
+  it("first visit shows an empty state and persists NOTHING", () => {
     render(<HousingLoanTab />);
+    expect(screen.getByText(/Track a property purchase/i)).toBeInTheDocument();
+    // Regression: a phantom "My Property · RM 500,000" used to be silently
+    // saved here and then reported by the Summary tab as a real asset
+    expect(localStorage.getItem("hl_props_v1")).toBeNull();
+  });
+
+  it("adding the first property creates and persists it", () => {
+    renderWithProperty();
     expect(screen.getByText(/🏠 My Property/)).toBeInTheDocument();
-    // Default newProperty(): RM500k @ 4% over 35 years
-    expect(screen.getByDisplayValue("500000")).toBeInTheDocument();
+    expect(screen.getByDisplayValue("500,000")).toBeInTheDocument(); // MoneyInput formats live
+    expect(JSON.parse(localStorage.getItem("hl_props_v1"))).toHaveLength(1);
   });
 
   it("shows a validation error when adding a downpayment with no date or amount", () => {
-    render(<HousingLoanTab />);
+    renderWithProperty();
     fireEvent.click(screen.getAllByText("+ Add")[0]); // downpayment Add button
     expect(screen.getByText(/Date and amount are required/i)).toBeInTheDocument();
   });
@@ -31,10 +49,10 @@ describe("HousingLoanTab", () => {
     [...container.querySelectorAll('input[type="date"]')].at(-1);
 
   it("adds a downpayment record and reduces the loan amount", () => {
-    const { container } = render(<HousingLoanTab />);
+    const { container } = renderWithProperty();
 
     const dateInput   = dpDateInput(container);
-    const amountInput = screen.getByPlaceholderText("e.g. 50000");
+    const amountInput = screen.getByPlaceholderText("e.g. 50,000");
     fireEvent.change(dateInput,   { target: { value: "2026-01-15" } });
     fireEvent.change(amountInput, { target: { value: "50000" } });
     fireEvent.click(screen.getAllByText("+ Add")[0]);
@@ -47,9 +65,9 @@ describe("HousingLoanTab", () => {
   });
 
   it("persists records to localStorage", () => {
-    const { container } = render(<HousingLoanTab />);
+    const { container } = renderWithProperty();
     fireEvent.change(dpDateInput(container), { target: { value: "2026-02-01" } });
-    fireEvent.change(screen.getByPlaceholderText("e.g. 50000"), { target: { value: "25000" } });
+    fireEvent.change(screen.getByPlaceholderText("e.g. 50,000"), { target: { value: "25000" } });
     fireEvent.click(screen.getAllByText("+ Add")[0]);
 
     const stored = JSON.parse(localStorage.getItem("hl_props_v1"));
@@ -58,26 +76,25 @@ describe("HousingLoanTab", () => {
   });
 
   it("adds a second property via + Add Property", () => {
-    render(<HousingLoanTab />);
+    renderWithProperty();
     fireEvent.click(screen.getByText("+ Add Property"));
     expect(JSON.parse(localStorage.getItem("hl_props_v1"))).toHaveLength(2);
   });
 
   it("delete asks for confirmation and keeps the property when declined", () => {
     vi.spyOn(window, "confirm").mockReturnValue(false);
-    render(<HousingLoanTab />);
+    renderWithProperty();
     fireEvent.click(screen.getByText("Delete Property"));
     expect(window.confirm).toHaveBeenCalled();
     expect(screen.getByText(/🏠 My Property/)).toBeInTheDocument();
   });
 
-  it("deleting the last property replaces it with a fresh one", () => {
+  it("deleting the last property returns to the empty state and clears storage", () => {
     vi.spyOn(window, "confirm").mockReturnValue(true);
-    render(<HousingLoanTab />);
+    renderWithProperty();
     fireEvent.click(screen.getByText("Delete Property"));
-    // Never left with zero properties
-    expect(JSON.parse(localStorage.getItem("hl_props_v1"))).toHaveLength(1);
-    expect(screen.getByText(/🏠 My Property/)).toBeInTheDocument();
+    expect(screen.getByText(/Track a property purchase/i)).toBeInTheDocument();
+    expect(localStorage.getItem("hl_props_v1")).toBeNull();
   });
 });
 
@@ -96,7 +113,30 @@ describe("SummaryTab", () => {
 
   it("renders the projected CPF total", () => {
     renderTab();
-    expect(screen.getByText("S$220,000")).toBeInTheDocument();
+    // Appears in both the net-worth hero and the CPF section
+    expect(screen.getAllByText("S$220,000").length).toBeGreaterThanOrEqual(1);
+  });
+
+  it("shows a unified net-worth hero that sums the currency blocks in SGD", () => {
+    // CPF 220k (SGD) + property equity 50k MYR ×0.30 + stocks 1800 USD ×1.35
+    localStorage.setItem("fx_myr_sgd", "0.30");
+    localStorage.setItem("fx_usd_sgd", "1.35");
+    localStorage.setItem("hl_props_v1", JSON.stringify([
+      { id: "p", name: "C", purchasePrice: 200000, downpaymentRecords: [{ id: "d", amount: 50000 }] },
+    ]));
+    localStorage.setItem("stocks_v1", JSON.stringify([
+      { id: "s", ticker: "AAPL", shares: 10, avgCost: 180, totalFees: 0 },
+    ]));
+    renderTab();
+    // 220000 + 50000*0.30 (15000) + 1800*1.35 (2430) = 237430
+    expect(screen.getByText(/Estimated Total Net Worth/i)).toBeInTheDocument();
+    expect(screen.getByText("≈ S$237,430")).toBeInTheDocument();
+  });
+
+  it("net-worth hero is CPF-only (100%) when no assets are entered", () => {
+    renderTab();
+    expect(screen.getByText("≈ S$220,000")).toBeInTheDocument();
+    expect(screen.getByText(/CPF ·/)).toBeInTheDocument();
   });
 
   it("adds a goal and shows progress against the mapped currency", () => {
@@ -145,5 +185,90 @@ describe("SummaryTab", () => {
     renderTab();
     fireEvent.click(screen.getByText("+ Add"));
     expect(localStorage.getItem("goals_v1")).toBe("[]");
+  });
+});
+
+// ─── MoneyInput — live thousands separators ───────────────────────────────────
+
+describe("MoneyInput", () => {
+  function Harness({ initial = 0 }) {
+    const [v, setV] = useState(initial);
+    return <MoneyInput value={v} onChange={setV} placeholder="amount" />;
+  }
+
+  it("formats typed digits with thousands separators", () => {
+    render(<Harness />);
+    const input = screen.getByPlaceholderText("amount");
+    fireEvent.change(input, { target: { value: "480000" } });
+    expect(input).toHaveValue("480,000");
+  });
+
+  it("emits a plain integer, stripping any pasted separators/garbage", () => {
+    const onChange = vi.fn();
+    render(<MoneyInput value={0} onChange={onChange} placeholder="amount" />);
+    fireEvent.change(screen.getByPlaceholderText("amount"), { target: { value: "RM 1,234,567" } });
+    expect(onChange).toHaveBeenCalledWith(1234567);
+  });
+
+  it("clearing the field emits 0 and shows the placeholder", () => {
+    render(<Harness initial={5000} />);
+    const input = screen.getByPlaceholderText("amount");
+    expect(input).toHaveValue("5,000");
+    fireEvent.change(input, { target: { value: "" } });
+    expect(input).toHaveValue("");
+  });
+
+  it("clamps to max", () => {
+    const onChange = vi.fn();
+    render(<MoneyInput value={0} onChange={onChange} max={1000} placeholder="amount" />);
+    fireEvent.change(screen.getByPlaceholderText("amount"), { target: { value: "99999" } });
+    expect(onChange).toHaveBeenCalledWith(1000);
+  });
+
+  it("uses the numeric mobile keypad", () => {
+    render(<MoneyInput value={0} onChange={() => {}} placeholder="amount" />);
+    expect(screen.getByPlaceholderText("amount")).toHaveAttribute("inputmode", "numeric");
+  });
+});
+
+// ─── QuickStart — first-run onboarding ────────────────────────────────────────
+
+describe("QuickStart", () => {
+  const setup = (over = {}) => {
+    const onComplete = vi.fn();
+    const onClose = vi.fn();
+    render(<QuickStart initialSalary={5000} initialAge={30} initialPrYear={1}
+      monthlyContrib={450} onComplete={onComplete} onClose={onClose} {...over} />);
+    return { onComplete, onClose };
+  };
+
+  it("renders the three setup questions", () => {
+    setup();
+    expect(screen.getByText(/Monthly salary/i)).toBeInTheDocument();
+    expect(screen.getByText(/Your age/i)).toBeInTheDocument();
+    expect(screen.getByText(/PR status year/i)).toBeInTheDocument();
+  });
+
+  it("submitting fires onComplete with entered values and shows the ready screen", () => {
+    const { onComplete } = setup();
+    fireEvent.change(screen.getByPlaceholderText("e.g. 5,000"), { target: { value: "7000" } });
+    fireEvent.click(screen.getByRole("button", { name: /See my projection/ }));
+    expect(onComplete).toHaveBeenCalledWith({ salary: 7000, age: 30, prYear: 1 });
+    expect(screen.getByText(/Your CPF projection is ready/i)).toBeInTheDocument();
+  });
+
+  it("the ready screen closes as completed", () => {
+    const { onClose } = setup();
+    fireEvent.change(screen.getByPlaceholderText("e.g. 5,000"), { target: { value: "7000" } });
+    fireEvent.click(screen.getByRole("button", { name: /See my projection/ }));
+    fireEvent.click(screen.getByRole("button", { name: /Explore my projection/ }));
+    expect(onClose).toHaveBeenCalledWith(true);
+  });
+
+  it("skip closes as not-completed without applying values", () => {
+    const { onComplete, onClose } = setup();
+    fireEvent.click(screen.getByRole("button", { name: /Skip/ }));
+    expect(onComplete).not.toHaveBeenCalled();
+    expect(onClose).toHaveBeenCalledWith(false);
   });
 });

@@ -15,7 +15,7 @@ export function MonthlyBreakdown({ monthly, prYear, age }) {
     <div style={{ background: "var(--card-bg)", borderRadius: 16, padding: 24, border: "1px solid var(--border)", marginBottom: 28 }}>
       <div className="section-title">Monthly Contribution Breakdown</div>
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 24 }}>
-        <StatCard label="Take-Home Pay"     value={fmtD(monthly.takeHome)}        sub="After employee CPF"                                       color="#e8eaf0" />
+        <StatCard label="Take-Home Pay"     value={fmtD(monthly.takeHome)}        sub="After employee CPF"                                       color="var(--text)" />
         <StatCard label="Your Contribution" value={fmtD(monthly.employeeContrib)} sub={`${(monthly.rates.employee * 100).toFixed(0)}% of capped wage`} color={SEM.ma} />
         <StatCard label="Employer Pays"     value={fmtD(monthly.employerContrib)} sub={`${(monthly.rates.employer * 100).toFixed(0)}% of capped wage`} color="var(--accent2)" />
         <StatCard label="Total to CPF"      value={fmtD(monthly.totalContrib)}    sub={`${(monthly.rates.total * 100).toFixed(0)}% combined`}        color="var(--accent)" />

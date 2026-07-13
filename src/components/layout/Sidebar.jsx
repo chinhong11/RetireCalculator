@@ -2,6 +2,7 @@ import { OW_CEILING, fmt, fmtD } from "../../lib/cpf.js";
 import { SEM } from "../../theme.js";
 import { SliderInput }      from "../shared/SliderInput.jsx";
 import { Hint }             from "../shared/Hint.jsx";
+import { MoneyInput }       from "../shared/MoneyInput.jsx";
 import { MonthlyBreakdown } from "../shared/MonthlyBreakdown.jsx";
 
 const GLOSSARY = {
@@ -57,14 +58,10 @@ export function Sidebar({
           <StepLabel n={1} title="Profile" />
           <div style={{ marginBottom: 18 }}>
             <label style={{ fontSize: 13, color: "var(--label)", fontWeight: 500, display: "block", marginBottom: 6 }}>Monthly Salary (SGD)</label>
-            <input
-              type="number" className="input-field" value={salary || ""} min={0} step={100}
-              placeholder="e.g. 5000"
-              onChange={e => {
-                const v = Math.max(0, parseInt(e.target.value) || 0);
-                setSalary(v);
-                setShowWelcome(false);
-              }}
+            <MoneyInput
+              className="input-field" value={salary} max={1_000_000}
+              placeholder="e.g. 5,000"
+              onChange={v => { setSalary(v); setShowWelcome(false); }}
             />
             {salary === 0 && (
               <div style={{ fontSize: 11, color: "var(--muted)", marginTop: 6 }}>
@@ -141,9 +138,9 @@ export function Sidebar({
               </label>
               <div style={{ position: "relative" }}>
                 <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, borderRadius: "8px 0 0 8px", background: color, opacity: 0.7 }} />
-                <input
-                  type="number" min="0" value={value || ""} placeholder="0"
-                  onChange={e => set(parseFloat(e.target.value) || 0)}
+                <MoneyInput
+                  value={value} placeholder="0" max={10_000_000}
+                  onChange={set}
                   className="hl-in"
                   style={{ paddingLeft: 14, fontFamily: "'DM Mono', monospace", fontSize: 14 }}
                 />
@@ -173,9 +170,9 @@ export function Sidebar({
                   </div>
                   <div style={{ position: "relative" }}>
                     <div style={{ position: "absolute", left: 0, top: 0, bottom: 0, width: 3, borderRadius: "8px 0 0 8px", background: SEM.sa, opacity: 0.7 }} />
-                    <input
-                      type="number" min="0" max={saStart} placeholder="e.g. 40,000" value={saShield || ""}
-                      onChange={e => setSaShield(Math.max(0, parseFloat(e.target.value) || 0))}
+                    <MoneyInput
+                      value={saShield} placeholder="e.g. 40,000" max={10_000_000}
+                      onChange={setSaShield}
                       className="hl-in"
                       style={{ paddingLeft: 14, fontFamily: "'DM Mono', monospace", fontSize: 14 }}
                     />

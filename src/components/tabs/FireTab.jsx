@@ -254,7 +254,7 @@ export default function FireTab({ projectionData, yearsToProject }) {
 
       <div style={cardStyle}>
         <div style={{ fontSize: 12, color: "var(--label)", fontWeight: 600, marginBottom: 12 }}>Sensitivity — FIRE Number by Monthly Expenses</div>
-        <div style={{ overflowX: "auto" }}>
+        <div className="x-scroll">
           <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 12 }}>
             <thead>
               <tr style={{ color: "var(--muted)", borderBottom: "1px solid var(--border)" }}>

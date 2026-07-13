@@ -5,33 +5,43 @@ import { toCsv, downloadBlob, printTable } from "../../lib/backup.js";
 import { notifyPersist } from "../../lib/usePersistedState.js";
 import { StatCard } from "../shared/StatCard.jsx";
 import { LabelField } from "../shared/LabelField.jsx";
+import { MoneyInput } from "../shared/MoneyInput.jsx";
 import { SEM } from "../../theme.js";
 
 const safeFloat = (val, max = 1e9) => { const n = parseFloat(val); return isFinite(n) ? Math.min(Math.max(0, n), max) : 0; };
 const safeInt   = (val, max = 1e6) => { const n = parseInt(val, 10); return isFinite(n) ? Math.min(Math.max(0, n), max) : 0; };
 
 export default function HousingLoanTab() {
+  // Start EMPTY on first visit. Auto-creating a default property silently
+  // persisted a phantom "My Property · RM 500,000" that the Summary tab then
+  // reported as the user's real asset.
   const [properties, setProperties] = useState(() => {
     try {
       const s = localStorage.getItem("hl_props_v1");
-      if (s) { const p = JSON.parse(s); if (Array.isArray(p) && p.length) return p; }
+      if (s) { const p = JSON.parse(s); if (Array.isArray(p)) return p; }
     } catch {}
-    return [newProperty()];
+    return [];
   });
 
   const [selId, setSelId] = useState(() => {
     try { return localStorage.getItem("hl_selid_v1") || null; } catch { return null; }
   });
 
-  const [dpForm, setDpForm] = useState({ date: "", amount: "", note: "" });
+  const [dpForm, setDpForm] = useState({ date: "", amount: 0, note: "" });
   const [dpError, setDpError] = useState("");
-  const [prForm, setPrForm] = useState({ month: "", claimAmount: "", stage: "", note: "" });
+  const [prForm, setPrForm] = useState({ month: "", claimAmount: 0, stage: "", note: "" });
   const [prError, setPrError] = useState("");
   const [showAmort, setShowAmort] = useState(false);
   const [amortYear, setAmortYear] = useState(1);
 
   useEffect(() => {
-    try { localStorage.setItem("hl_props_v1", JSON.stringify(properties)); notifyPersist(); } catch {}
+    try {
+      // Don't write an empty list on first visit — its mere presence makes
+      // other tabs (and the backup nudge) believe the user has entered data
+      if (properties.length) localStorage.setItem("hl_props_v1", JSON.stringify(properties));
+      else localStorage.removeItem("hl_props_v1");
+      notifyPersist();
+    } catch {}
   }, [properties]);
 
   useEffect(() => {
@@ -52,9 +62,8 @@ export default function HousingLoanTab() {
   const delProp = () => {
     if (!window.confirm(`Delete "${prop?.name}"? This cannot be undone.`)) return;
     const next = properties.filter(p => p.id !== effectiveId);
-    const fallback = next.length ? next : [newProperty()];
-    setProperties(fallback);
-    setSelId(fallback[0].id);
+    setProperties(next);
+    setSelId(next[0]?.id ?? null);
   };
 
   const addDP = () => {
@@ -65,7 +74,7 @@ export default function HousingLoanTab() {
     setDpError("");
     const rec = { id: uid(), date: dpForm.date, amount: safeFloat(dpForm.amount), note: dpForm.note.trim() };
     upd({ downpaymentRecords: [...(prop.downpaymentRecords || []), rec].sort((a, b) => a.date.localeCompare(b.date)) });
-    setDpForm({ date: "", amount: "", note: "" });
+    setDpForm({ date: "", amount: 0, note: "" });
   };
 
   const delDP = (recId) => prop && upd({ downpaymentRecords: (prop.downpaymentRecords || []).filter(r => r.id !== recId) });
@@ -82,7 +91,7 @@ export default function HousingLoanTab() {
     setPrError("");
     const rec = { id: uid(), month: prForm.month, claimAmount: safeFloat(prForm.claimAmount), stage: prForm.stage.trim(), note: prForm.note.trim() };
     upd({ progressiveRecords: [...(prop.progressiveRecords || []), rec].sort((a, b) => a.month.localeCompare(b.month)) });
-    setPrForm({ month: "", claimAmount: "", stage: "", note: "" });
+    setPrForm({ month: "", claimAmount: 0, stage: "", note: "" });
   };
 
   const delPR = (recId) => prop && upd({ progressiveRecords: (prop.progressiveRecords || []).filter(r => r.id !== recId) });
@@ -102,7 +111,31 @@ export default function HousingLoanTab() {
   const amortYearInterest = amortYearRows.reduce((s, r) => s + r.interest, 0);
   const amortYearPrincipal = amortYearRows.reduce((s, r) => s + r.principal, 0);
 
-  if (!prop) return null;
+  // Empty state: no property yet — invite instead of auto-creating one
+  if (!prop) {
+    return (
+      <div style={{
+        background: "var(--card-bg)", borderRadius: 16, border: "1px solid var(--border)",
+        padding: "56px 24px", textAlign: "center",
+      }}>
+        <div style={{ fontSize: 40, marginBottom: 12 }}>🏠</div>
+        <div style={{ fontSize: 18, fontWeight: 800, letterSpacing: "-0.01em", marginBottom: 8 }}>
+          Track a property purchase
+        </div>
+        <div style={{ fontSize: 13, color: "var(--muted)", lineHeight: 1.7, maxWidth: 440, margin: "0 auto 24px" }}>
+          Record your downpayments, see the full loan amortization schedule, and — for
+          under-construction properties — estimate progressive interest before handover.
+        </div>
+        <button onClick={addProp} style={{
+          padding: "12px 24px", borderRadius: 10, border: "none",
+          background: "var(--accent)", color: "#0a0e17", fontWeight: 700, fontSize: 14,
+          cursor: "pointer", fontFamily: "inherit",
+        }}>
+          + Add my first property
+        </button>
+      </div>
+    );
+  }
 
   const exportHousingCsv = () => {
     const summaryRows = properties.map(p => {
@@ -233,7 +266,7 @@ export default function HousingLoanTab() {
             </select>
           </LabelField>
           <LabelField label="Purchase Price (RM)">
-            <input className="hl-in" type="number" value={prop.purchasePrice} onChange={e => upd({ purchasePrice: safeFloat(e.target.value, 1e9) })} min={0} step={1000} style={{ fontFamily: "'DM Mono', monospace" }} />
+            <MoneyInput className="hl-in" value={prop.purchasePrice} max={1e9} onChange={v => upd({ purchasePrice: v })} style={{ fontFamily: "'DM Mono', monospace" }} />
           </LabelField>
           <LabelField label="Interest Rate (% p.a.)">
             <input className="hl-in" type="number" value={prop.interestRate} onChange={e => upd({ interestRate: safeFloat(e.target.value, 20) })} min={0} max={20} step={0.05} style={{ fontFamily: "'DM Mono', monospace" }} />
@@ -259,7 +292,7 @@ export default function HousingLoanTab() {
 
       {/* Loan Summary Cards */}
       <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginBottom: 20 }}>
-        <StatCard label="Purchase Price" value={RM(prop.purchasePrice)} color="#e8eaf0" />
+        <StatCard label="Purchase Price" value={RM(prop.purchasePrice)} color="var(--text)" />
         <StatCard label="Downpayment Paid" value={RM(totalDownpaid)} sub={prop.purchasePrice > 0 ? `${((totalDownpaid / prop.purchasePrice) * 100).toFixed(1)}% of price` : "—"} color="var(--accent)" />
         <StatCard label="Loan Amount" value={RM(loanAmount)} sub={prop.purchasePrice > 0 ? `${((loanAmount / prop.purchasePrice) * 100).toFixed(1)}% financing` : "—"} color="var(--accent2)" />
         <StatCard label="Monthly Installment" value={RM2(monthlyInstallment)} sub={`${prop.tenure}yr @ ${prop.interestRate}% p.a.`} color={SEM.ma} />
@@ -300,7 +333,7 @@ export default function HousingLoanTab() {
                   { label: "Total Principal", val: RM(amortTotalPrincipal), color: "var(--accent)" },
                   { label: "Total Interest", val: RM(amortTotalInterest), color: SEM.danger },
                   { label: "Interest / Loan", val: loanAmount > 0 ? `${((amortTotalInterest / loanAmount) * 100).toFixed(1)}%` : "—", color: SEM.warn },
-                  { label: "Total Cost", val: RM(amortTotalPrincipal + amortTotalInterest), color: "#e8eaf0" },
+                  { label: "Total Cost", val: RM(amortTotalPrincipal + amortTotalInterest), color: "var(--text)" },
                 ].map(({ label, val, color }) => (
                   <div key={label} style={{ flex: "1 1 120px", padding: "12px 16px", borderRadius: 10, background: "rgba(255,255,255,0.03)", border: "1px solid var(--border)" }}>
                     <div style={{ fontSize: 11, color: "var(--muted)", textTransform: "uppercase", letterSpacing: "0.07em", fontWeight: 600, marginBottom: 4 }}>{label}</div>
@@ -329,7 +362,7 @@ export default function HousingLoanTab() {
               </div>
 
               {/* Table */}
-              <div style={{ borderTop: "1px solid var(--border)", overflowX: "auto" }}>
+              <div className="x-scroll" style={{ borderTop: "1px solid var(--border)" }}>
                 <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                   <thead>
                     <tr style={{ background: "rgba(255,255,255,0.02)" }}>
@@ -382,7 +415,7 @@ export default function HousingLoanTab() {
           </div>
           <div style={{ flex: "1 1 140px" }}>
             <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Amount (RM)</label>
-            <input className="hl-in" type="number" placeholder="e.g. 50000" value={dpForm.amount} onChange={e => setDpForm(f => ({ ...f, amount: e.target.value }))} min={0} step={100} style={{ fontFamily: "'DM Mono', monospace" }} />
+            <MoneyInput className="hl-in" placeholder="e.g. 50,000" value={dpForm.amount} max={1e9} onChange={v => setDpForm(f => ({ ...f, amount: v }))} style={{ fontFamily: "'DM Mono', monospace" }} />
           </div>
           <div style={{ flex: "2 1 200px" }}>
             <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Note</label>
@@ -394,7 +427,7 @@ export default function HousingLoanTab() {
           </div>
         </div>
         {(prop.downpaymentRecords || []).length > 0 ? (
-          <div style={{ overflowX: "auto" }}>
+          <div className="x-scroll">
             <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
               <thead>
                 <tr style={{ borderBottom: "1px solid var(--border)" }}>
@@ -451,7 +484,7 @@ export default function HousingLoanTab() {
             </div>
             <div style={{ flex: "1 1 140px" }}>
               <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Claim Amount (RM)</label>
-              <input className="hl-in" type="number" placeholder="Amount disbursed" value={prForm.claimAmount} onChange={e => setPrForm(f => ({ ...f, claimAmount: e.target.value }))} min={0} step={1000} style={{ fontFamily: "'DM Mono', monospace" }} />
+              <MoneyInput className="hl-in" placeholder="Amount disbursed" value={prForm.claimAmount} max={1e9} onChange={v => setPrForm(f => ({ ...f, claimAmount: v }))} style={{ fontFamily: "'DM Mono', monospace" }} />
             </div>
             <div style={{ flex: "2 1 180px" }}>
               <label style={{ fontSize: 11, color: "var(--label)", display: "block", marginBottom: 4 }}>Construction Stage</label>
@@ -467,7 +500,7 @@ export default function HousingLoanTab() {
             </div>
           </div>
           {progressiveTimeline.length > 0 ? (
-            <div style={{ overflowX: "auto" }}>
+            <div className="x-scroll">
               <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
                 <thead>
                   <tr style={{ borderBottom: "1px solid var(--border)" }}>
@@ -493,14 +526,15 @@ export default function HousingLoanTab() {
                     </tr>
                   ))}
                 </tbody>
-                <tfoot>
-                  <tr style={{ borderTop: "2px solid var(--border)" }}>
-                    <td colSpan={6} style={{ padding: "12px", fontWeight: 700, color: "var(--label)" }}>Est. Total Interest During Construction</td>
-                    <td style={{ padding: "12px", fontFamily: "'DM Mono', monospace", fontWeight: 800, color: SEM.ma, fontSize: 15 }}>{RM2(totalProgInterest)}</td>
-                    <td colSpan={2} />
-                  </tr>
-                </tfoot>
               </table>
+            </div>
+          ) : null}
+          {progressiveTimeline.length > 0 ? (
+            // Outside the scroll container so the headline total is always
+            // visible — in the tfoot it sat off-screen on narrow viewports.
+            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap", padding: "12px 12px 0", borderTop: "2px solid var(--border)" }}>
+              <span style={{ fontWeight: 700, color: "var(--label)", fontSize: 13 }}>Est. Total Interest During Construction</span>
+              <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 800, color: SEM.ma, fontSize: 15 }}>{RM2(totalProgInterest)}</span>
             </div>
           ) : (
             <div style={{ textAlign: "center", padding: "28px", color: "var(--muted)", fontSize: 13 }}>

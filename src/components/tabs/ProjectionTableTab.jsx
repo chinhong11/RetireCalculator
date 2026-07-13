@@ -15,7 +15,7 @@ export default function ProjectionTableTab({ projectionData, effectiveSaShield, 
 
   return (
     <div style={{ background: "var(--card-bg)", borderRadius: 16, border: "1px solid var(--border)", marginBottom: 28, overflow: "hidden" }}>
-      <div style={{ overflowX: "auto" }}>
+      <div className="x-scroll">
         <table style={{ width: "100%", borderCollapse: "collapse", fontSize: 13 }}>
           <thead>
             <tr style={{ borderBottom: "1px solid var(--border)" }}>

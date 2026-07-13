@@ -2,6 +2,7 @@ import { useState, useEffect, useMemo } from "react";
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { EXPENSE_CATS, EXPENSE_CAT_COLORS } from "../../lib/finance.js";
 import { usePersistedState } from "../../lib/usePersistedState.js";
+import { MoneyInput } from "../shared/MoneyInput.jsx";
 import { SEM } from "../../theme.js";
 
 export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly, salary }) {
@@ -110,15 +111,15 @@ export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly,
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 14 }}>
           <div>
             <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>Take-home pay (after CPF deduction)</div>
-            <input type="number" min={0} value={takeHome} onChange={e => setTakeHome(parseFloat(e.target.value) || 0)} style={inputStyle} />
+            <MoneyInput value={takeHome} max={1_000_000} onChange={setTakeHome} style={inputStyle} />
           </div>
           <div>
             <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>Other income (freelance, rental, etc.)</div>
-            <input type="number" min={0} value={otherIncome} onChange={e => setOtherIncome(parseFloat(e.target.value) || 0)} style={inputStyle} />
+            <MoneyInput value={otherIncome} max={1_000_000} onChange={setOtherIncome} style={inputStyle} />
           </div>
           <div>
             <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>Cash / savings starting balance (SGD)</div>
-            <input type="number" min={0} value={startCash} onChange={e => setStartCash(parseFloat(e.target.value) || 0)} style={inputStyle} />
+            <MoneyInput value={startCash} max={1e8} onChange={setStartCash} style={inputStyle} />
           </div>
           <div>
             <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>
