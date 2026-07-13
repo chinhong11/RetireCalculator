@@ -16,6 +16,7 @@
  * }} ProjectionRow
  * @typedef {{
  *   raAtPayout: number, monthlyPayout: number,
+ *   payoutLow: number, payoutHigh: number,
  *   extrapolated: boolean, fromAge: number | null, payoutAge: number,
  * }} CpfLifePayout
  */

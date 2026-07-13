@@ -4,10 +4,21 @@ import { useState } from "react";
 import { render, screen, fireEvent, cleanup, within } from "@testing-library/react";
 import "@testing-library/jest-dom/vitest";
 
+// jsdom has no ResizeObserver; stub recharts (chart internals aren't under test)
+vi.mock("recharts", () => ({
+  ResponsiveContainer: ({ children }) => <div>{children}</div>,
+  LineChart: ({ children }) => <div>{children}</div>,
+  AreaChart: ({ children }) => <div>{children}</div>,
+  Line: () => null, Area: () => null,
+  XAxis: () => null, YAxis: () => null,
+  Tooltip: () => null, CartesianGrid: () => null, Legend: () => null,
+}));
+
 import HousingLoanTab from "../tabs/HousingLoanTab.jsx";
 import SummaryTab from "../tabs/SummaryTab.jsx";
 import { QuickStart } from "../shared/QuickStart.jsx";
 import { MoneyInput } from "../shared/MoneyInput.jsx";
+import { ScenarioCompare } from "../shared/ScenarioCompare.jsx";
 
 beforeEach(() => localStorage.clear());
 afterEach(() => { cleanup(); vi.restoreAllMocks(); });
@@ -228,6 +239,46 @@ describe("MoneyInput", () => {
   it("uses the numeric mobile keypad", () => {
     render(<MoneyInput value={0} onChange={() => {}} placeholder="amount" />);
     expect(screen.getByPlaceholderText("amount")).toHaveAttribute("inputmode", "numeric");
+  });
+});
+
+// ─── ScenarioCompare — "what if?" projections ─────────────────────────────────
+
+describe("ScenarioCompare", () => {
+  // age 40 + 20 yrs reaches 60, so the RA forms and CPF LIFE estimates render
+  const baseInputs = {
+    salary: 5000, age: 40, prYear: 3, annualIncrement: 3, yearsToProject: 20,
+    oaReturn: 2.5, saReturn: 4, maReturn: 4,
+    oaStart: 0, saStart: 0, maStart: 0,
+    frsGrowthRate: 3.5, bhsGrowthRate: 3.5, saShield: 0,
+  };
+
+  it("is collapsed by default and expands on demand", () => {
+    render(<ScenarioCompare baseInputs={baseInputs} gridLineColor="#333" />);
+    expect(screen.queryByText(/Scenario B — Monthly salary/)).not.toBeInTheDocument();
+    fireEvent.click(screen.getByText(/Compare a/));
+    expect(screen.getByText(/Scenario B — Monthly salary/)).toBeInTheDocument();
+  });
+
+  it("a higher scenario-B salary produces a positive difference", () => {
+    const { container } = render(<ScenarioCompare baseInputs={baseInputs} gridLineColor="#333" />);
+    fireEvent.click(screen.getByText(/Compare a/));
+    const salaryB = screen.getByDisplayValue("5,000");
+    fireEvent.change(salaryB, { target: { value: "8000" } });
+
+    const diffCard = screen.getByText(/Difference after 20 yrs/).parentElement;
+    expect(diffCard).toHaveTextContent(/\+\$/); // strictly more CPF
+    // Both CPF LIFE ranges shown (text spans styled children)
+    expect(container.textContent).toMatch(/Est\. CPF LIFE at 65/);
+  });
+
+  it("reset restores scenario B to the current inputs", () => {
+    render(<ScenarioCompare baseInputs={baseInputs} gridLineColor="#333" />);
+    fireEvent.click(screen.getByText(/Compare a/));
+    fireEvent.change(screen.getByDisplayValue("5,000"), { target: { value: "9000" } });
+    fireEvent.click(screen.getByText(/Reset to current/));
+    expect(screen.getByDisplayValue("5,000")).toBeInTheDocument();
+    expect(screen.queryByText(/Reset to current/)).not.toBeInTheDocument();
   });
 });
 
