@@ -67,6 +67,21 @@ export default function EPFTab() {
         <div>
           <div style={{ fontSize: 11, color: "var(--muted)", marginBottom: 4 }}>EPF Dividend Rate (%)</div>
           <input type="number" min={0} max={20} step={0.1} value={dividendRate} onChange={e => setDividendRate(parseFloat(e.target.value) || 0)} style={inputStyle} />
+          {/* Quick-set presets grounded in EPF's declared-dividend history */}
+          <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+            {[
+              { label: "Conservative 5.0%", rate: 5.0 },
+              { label: "10-yr avg ≈5.7%",   rate: 5.7 },
+              { label: "Shariah ≈5.3%",     rate: 5.3 },
+            ].map(({ label, rate }) => (
+              <button key={label} onClick={() => setDividendRate(rate)} style={{
+                padding: "3px 10px", borderRadius: 6, fontSize: 10, fontFamily: "inherit", cursor: "pointer",
+                border: "1px solid", borderColor: dividendRate === rate ? EPF_PER : "var(--border)",
+                background: dividendRate === rate ? "rgba(59,130,246,0.12)" : "transparent",
+                color: dividendRate === rate ? EPF_PER : "var(--muted)",
+              }}>{label}</button>
+            ))}
+          </div>
         </div>
       </div>
 

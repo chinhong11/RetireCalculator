@@ -82,7 +82,7 @@ export async function exportCpfPdf({
       body: [
         ["RA at payout age", fmtD(cpfLifePayout.raAtPayout)],
         ["Payout age", String(cpfLifePayout.payoutAge)],
-        ["Est. monthly payout", `~${fmtD(cpfLifePayout.monthlyPayout)} / month`],
+        ["Est. monthly payout", `${fmtD(cpfLifePayout.payoutLow)} – ${fmtD(cpfLifePayout.payoutHigh)} / month`],
         cpfLifePayout.extrapolated
           ? ["Note", `RA extrapolated from age ${cpfLifePayout.fromAge} at ${saReturn}% (no contributions assumed)`]
           : null,

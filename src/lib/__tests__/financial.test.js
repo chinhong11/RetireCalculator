@@ -617,6 +617,16 @@ describe("estimateCpfLifePayout", () => {
     expect(result.monthlyPayout).toBe(Math.round(result.raAtPayout * CPF_LIFE_RATE / 12));
   });
 
+  it("returns an honest payout range bracketing the midpoint", () => {
+    const rows   = projectYears(baseProj);
+    const result = estimateCpfLifePayout(rows, 4);
+    expect(result.payoutLow).toBeLessThan(result.monthlyPayout);
+    expect(result.payoutHigh).toBeGreaterThan(result.monthlyPayout);
+    // Band stays within ±10% of the midpoint — sanity guard on the constants
+    expect(result.payoutLow).toBeGreaterThan(result.monthlyPayout * 0.9);
+    expect(result.payoutHigh).toBeLessThan(result.monthlyPayout * 1.1);
+  });
+
   it("larger RA produces higher monthly payout", () => {
     // With RA inflows capped at the FRS, differentiate via a short horizon
     // where the low-salary projection has NOT yet filled RA to the cap.

@@ -109,11 +109,11 @@ export default function ProjectionTab({
                 : ""})
             </span>
             <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 800, color: "var(--accent)", fontSize: 15 }}>
-              ~{fmtD(cpfLifePayout.monthlyPayout)}/mo
+              {fmtD(cpfLifePayout.payoutLow)}–{fmtD(cpfLifePayout.payoutHigh)}/mo
             </span>
           </div>
           <div style={{ marginTop: 4, fontSize: 11 }}>
-            Based on projected RA of {fmtD(cpfLifePayout.raAtPayout)} · ~6.3% annual rate · verify at cpf.gov.sg/cpflife
+            Based on projected RA of {fmtD(cpfLifePayout.raAtPayout)} · range reflects CPF's published estimates (payouts vary by gender &amp; birth cohort) · verify at cpf.gov.sg/cpflife
           </div>
         </div>
       )}

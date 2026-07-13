@@ -43,7 +43,7 @@ const projectionData = [
 
 const finalData = projectionData[projectionData.length - 1];
 
-const cpfLifePayout = { raAtPayout: 213000, monthlyPayout: 1120, extrapolated: false, fromAge: null, payoutAge: 65 };
+const cpfLifePayout = { raAtPayout: 213000, monthlyPayout: 1120, payoutLow: 1065, payoutHigh: 1172, extrapolated: false, fromAge: null, payoutAge: 65 };
 
 // ─── Shared components ────────────────────────────────────────────────────
 import { CpfSummaryCards } from "../shared/CpfSummaryCards.jsx";

@@ -67,7 +67,13 @@ export const CPF_FRS_2026 = 213_000;
 export const CPF_BHS_2026 = 71_500;
 
 // CPF LIFE Standard Plan approximate annual payout rate on RA at payout age.
-export const CPF_LIFE_RATE = 0.063;
+// The Board publishes payout RANGES, not points (they vary by gender and
+// birth cohort) — e.g. FRS set aside at 55 → roughly $1,6xx–$1,7xx/mo from
+// 65. The band below reproduces those published ranges when applied to the
+// projected RA at 65; CPF_LIFE_RATE remains the midpoint single-figure.
+export const CPF_LIFE_RATE      = 0.063;
+export const CPF_LIFE_RATE_LOW  = 0.060;
+export const CPF_LIFE_RATE_HIGH = 0.066;
 
 /** @param {number} age @returns {string} */
 export function getRateKey(age) {
@@ -336,7 +342,10 @@ export function estimateCpfLifePayout(projectionData, saReturnPct, payoutAge = 6
   }
 
   const monthlyPayout = Math.round(raAtPayout * CPF_LIFE_RATE / 12);
-  return { raAtPayout, monthlyPayout, extrapolated, fromAge, payoutAge };
+  // Honest range matching how CPF publishes estimates (varies by gender/cohort)
+  const payoutLow  = Math.round(raAtPayout * CPF_LIFE_RATE_LOW / 12);
+  const payoutHigh = Math.round(raAtPayout * CPF_LIFE_RATE_HIGH / 12);
+  return { raAtPayout, monthlyPayout, payoutLow, payoutHigh, extrapolated, fromAge, payoutAge };
 }
 
 export const fmt  = (n) => n.toLocaleString("en-SG", { maximumFractionDigits: 0 });
