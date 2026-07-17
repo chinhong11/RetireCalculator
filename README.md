@@ -5,11 +5,11 @@ A personal finance web app for Singapore PRs and Malaysians to track CPF contrib
 ## Tabs
 
 ### 🌐 Summary
-- At-a-glance overview of all assets across currencies (SGD · MYR · USD)
-- **CPF (SGD):** projected OA / SA / MA balances with progress bars
+- **Unified net-worth hero** — one ≈ SGD figure summing CPF, MYR and USD assets at your FX rates, with a composition bar
+- **CPF (SGD):** projected OA / SA (or RA after 55) / MA balances with progress bars
 - **MYR Assets:** property equity + outstanding loans + Bursa Malaysia stocks cost basis
 - **USD Investments:** US Stocks and Crypto side-by-side with allocation bars
-- No currency conversion applied — each asset shown in its native currency
+- **Retirement goals** — track milestones per currency with projected achievement age
 
 ### 📈 Growth Chart
 - Visualise projected CPF balance over up to 40 years
@@ -64,25 +64,56 @@ A personal finance web app for Singapore PRs and Malaysians to track CPF contrib
 
 ## Tech Stack
 
-- React 18
-- Recharts (area chart)
-- Vite (build tool)
-- Inline CSS with CSS custom properties (dark theme)
-- Yahoo Finance API (MY Stocks, US Stocks price data)
-- CoinGecko API (Crypto price data)
+- React 18 · Vite · Recharts (charts, lazy-loaded) · jsPDF (PDF export, lazy-loaded)
+- Inline CSS with CSS custom properties (dark + light themes, `src/theme.js`)
+- Supabase (optional cloud sync of localStorage snapshots)
+- Yahoo Finance (stocks) · CoinGecko (crypto) · frankfurter.app (FX) — all fetched with timeouts and cache fallbacks
+- PWA: installable, offline-capable service worker
+
+## Architecture
+
+```
+src/
+  CPFCalculator.jsx        app shell: state, derived projections, tab routing
+  theme.js                 THEMES, GLOBAL_CSS, SEM semantic color tokens
+  components/
+    layout/                Header, Sidebar, TabBar
+    shared/                MoneyInput, QuickStart, ScenarioCompare, StatCard, …
+    tabs/                  12 lazy-loaded feature tabs
+  lib/
+    cpf.js  epf.js         projection math (pure, unit-tested)
+    housing.js  finance.js loan amortization, FD interest
+    usePersistedState.js   localStorage-backed state (single persistence path)
+    useCloudSync.js        3-way reconciliation with Supabase (see Security)
+    backup.js  migrations.js
+e2e/                       Playwright smoke test + ux-audit screenshot harness
+supabase/rls.sql           Row-Level Security policies (apply once — see Security)
+```
 
 ## Getting Started
 
 ```bash
-# Install dependencies
 npm install
+npm run dev        # development server
+npm run build      # production build
+npm run preview    # serve the production build
 
-# Start development server
-npm run dev
-
-# Build for production
-npm run build
+npm test           # 225 unit/component tests (vitest)
+npm run test:watch # watch mode
+npm run coverage   # coverage report
+npm run typecheck  # tsc checkJs over src/lib
+npm run e2e        # Playwright smoke test against the production build
 ```
+
+CI (GitHub Actions) runs typecheck + tests + build and the Playwright e2e job on every push and PR.
+
+## Security — Supabase Row-Level Security (required if you enable cloud sync)
+
+Cloud sync stores each user's complete financial snapshot in a `profiles`
+table, and the publishable API key ships in the client (that is normal for
+Supabase). **Without Row-Level Security, any visitor could read or overwrite
+other users' rows.** Apply `supabase/rls.sql` once in the Supabase SQL editor
+and verify in Dashboard → Database → `profiles` that RLS shows as enabled.
 
 ## Disclaimers
 

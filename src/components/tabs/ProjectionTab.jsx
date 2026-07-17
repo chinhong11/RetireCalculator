@@ -1,6 +1,7 @@
 import { AreaChart, Area, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from "recharts";
 import { CPF_FRS_2026, CPF_BHS_2026, fmtD } from "../../lib/cpf.js";
 import { CustomTooltip } from "../shared/CustomTooltip.jsx";
+import { ScenarioCompare } from "../shared/ScenarioCompare.jsx";
 import { SEM } from "../../theme.js";
 
 /**
@@ -17,7 +18,7 @@ import { SEM } from "../../theme.js";
 export default function ProjectionTab({
   projectionData, finalData, yearsToProject,
   ceilingGrowth, saReturn, cpfLifePayout,
-  gridLineColor,
+  gridLineColor, baseInputs,
 }) {
   return (
     <div style={{ background: "var(--card-bg)", borderRadius: 16, padding: 24, border: "1px solid var(--border)", marginBottom: 28 }}>
@@ -109,13 +110,17 @@ export default function ProjectionTab({
                 : ""})
             </span>
             <span style={{ fontFamily: "'DM Mono', monospace", fontWeight: 800, color: "var(--accent)", fontSize: 15 }}>
-              ~{fmtD(cpfLifePayout.monthlyPayout)}/mo
+              {fmtD(cpfLifePayout.payoutLow)}–{fmtD(cpfLifePayout.payoutHigh)}/mo
             </span>
           </div>
           <div style={{ marginTop: 4, fontSize: 11 }}>
-            Based on projected RA of {fmtD(cpfLifePayout.raAtPayout)} · ~6.3% annual rate · verify at cpf.gov.sg/cpflife
+            Based on projected RA of {fmtD(cpfLifePayout.raAtPayout)} · range reflects CPF's published estimates (payouts vary by gender &amp; birth cohort) · verify at cpf.gov.sg/cpflife
           </div>
         </div>
+      )}
+
+      {baseInputs && (
+        <ScenarioCompare baseInputs={baseInputs} gridLineColor={gridLineColor} />
       )}
     </div>
   );

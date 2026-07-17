@@ -105,17 +105,18 @@ export default function CPFCalculator() {
     [salary, age, prYear],
   );
 
-  const projectionData = useMemo(
-    () => projectYears({
-      salary, age, prYear, annualIncrement, yearsToProject,
-      oaReturn, saReturn, maReturn, oaStart, saStart, maStart,
-      frsGrowthRate: ceilingGrowth, bhsGrowthRate: ceilingGrowth,
-      saShield: effectiveSaShield,
-    }),
-    [salary, age, prYear, annualIncrement, yearsToProject,
-     oaReturn, saReturn, maReturn, oaStart, saStart, maStart,
-     ceilingGrowth, effectiveSaShield],
-  );
+  // Also handed to ScenarioCompare so "what if?" variants re-run the exact
+  // same projection with overrides.
+  const baseInputs = useMemo(() => ({
+    salary, age, prYear, annualIncrement, yearsToProject,
+    oaReturn, saReturn, maReturn, oaStart, saStart, maStart,
+    frsGrowthRate: ceilingGrowth, bhsGrowthRate: ceilingGrowth,
+    saShield: effectiveSaShield,
+  }), [salary, age, prYear, annualIncrement, yearsToProject,
+       oaReturn, saReturn, maReturn, oaStart, saStart, maStart,
+       ceilingGrowth, effectiveSaShield]);
+
+  const projectionData = useMemo(() => projectYears(baseInputs), [baseInputs]);
 
   const finalData     = projectionData[projectionData.length - 1];
   const cpfLifePayout = useMemo(
@@ -285,6 +286,7 @@ export default function CPFCalculator() {
                   yearsToProject={yearsToProject} ceilingGrowth={ceilingGrowth}
                   saReturn={saReturn} cpfLifePayout={cpfLifePayout}
                   gridLineColor={tv["--grid-line"]}
+                  baseInputs={baseInputs}
                 />
               </ErrorBoundary>
             </div>

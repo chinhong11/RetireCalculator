@@ -169,6 +169,13 @@ export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly,
           </div>
         )}
 
+        {expenses.length === 0 && !showForm && (
+          <div style={{ textAlign: "center", color: "var(--muted)", fontSize: 13, padding: "24px 0 8px" }}>
+            No expenses recorded yet. Click <strong style={{ color: "#f59e0b" }}>+ Add</strong> to
+            track rent, food, transport &amp; more — your savings rate updates as you go.
+          </div>
+        )}
+
         {expenses.length > 0 && (
           <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
             {expenses.map(e => (

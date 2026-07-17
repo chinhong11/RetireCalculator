@@ -128,6 +128,15 @@ export const GLOBAL_CSS = `
     .layout-grid { grid-template-columns: 1fr !important; }
     .sidebar-sticky { position: static !important; }
     .sidebar-scroll { max-height: none !important; overflow-y: visible !important; }
+
+    /* Pin the identifying first column (Yr / Month / Ticker) while the rest
+       of a wide table scrolls — needs a solid background to cover content
+       sliding beneath it */
+    .x-scroll table th:first-child,
+    .x-scroll table td:first-child {
+      position: sticky; left: 0; z-index: 1;
+      background: var(--bg);
+    }
   }
   @media (max-width: 480px) {
     .tab-btn { padding: 6px 12px; font-size: 12px; }

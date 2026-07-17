@@ -34,7 +34,7 @@ export function CpfSummaryCards({ finalData, yearsToProject, oaReturn, saReturn,
       {cpfLifePayout && (
         <StatCard
           label="Est. CPF LIFE payout"
-          value={`~${fmtD(cpfLifePayout.monthlyPayout)}/mo`}
+          value={`${fmtD(cpfLifePayout.payoutLow)}–${fmtD(cpfLifePayout.payoutHigh)}/mo`}
           color="var(--accent)"
           sub={`Standard Plan · age ${cpfLifePayout.payoutAge}`}
         />
