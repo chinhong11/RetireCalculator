@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from "react";
+import { useState, useMemo, useEffect, useRef } from "react";
 import { RM, RM2, uid, newProperty } from "../../lib/finance.js";
 import { loanSummary, progressiveTimeline as buildProgressiveTimeline, amortizationSchedule } from "../../lib/housing.js";
 import { toCsv, downloadBlob, printTable } from "../../lib/backup.js";
@@ -34,18 +34,28 @@ export default function HousingLoanTab() {
   const [showAmort, setShowAmort] = useState(false);
   const [amortYear, setAmortYear] = useState(1);
 
+  // Tracks whether THIS session ever held data, so emptying the list removes
+  // the key — but a corrupted stored value that failed to parse (state []
+  // from the start) is left untouched rather than silently destroyed.
+  const hadDataRef = useRef(properties.length > 0);
   useEffect(() => {
     try {
-      // Don't write an empty list on first visit — its mere presence makes
-      // other tabs (and the backup nudge) believe the user has entered data
-      if (properties.length) localStorage.setItem("hl_props_v1", JSON.stringify(properties));
-      else localStorage.removeItem("hl_props_v1");
+      if (properties.length) {
+        localStorage.setItem("hl_props_v1", JSON.stringify(properties));
+        hadDataRef.current = true;
+      } else if (hadDataRef.current) {
+        localStorage.removeItem("hl_props_v1");
+      }
       notifyPersist();
     } catch {}
   }, [properties]);
 
   useEffect(() => {
-    if (selId) try { localStorage.setItem("hl_selid_v1", selId); notifyPersist(); } catch {}
+    try {
+      if (selId) localStorage.setItem("hl_selid_v1", selId);
+      else localStorage.removeItem("hl_selid_v1");
+      notifyPersist();
+    } catch {}
   }, [selId]);
 
   const effectiveId = (properties.find(p => p.id === selId) ? selId : properties[0]?.id) || null;

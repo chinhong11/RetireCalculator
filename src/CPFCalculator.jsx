@@ -352,7 +352,7 @@ export default function CPFCalculator() {
       {/* ── First-run quick start ───────────────────────────────────────── */}
       {showQuickStart && (
         <QuickStart
-          initialSalary={salary} initialAge={age} initialPrYear={prYear}
+          initialSalary={0} initialAge={age} initialPrYear={prYear}
           monthlyContrib={monthly.totalContrib}
           onComplete={({ salary: s, age: a, prYear: p }) => { setSalary(s); setAge(a); setPrYear(p); }}
           onClose={(completed) => { setShowQuickStart(false); if (!completed) setShowWelcome(true); }}

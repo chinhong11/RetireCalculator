@@ -132,8 +132,10 @@ export const GLOBAL_CSS = `
     /* Pin the identifying first column (Yr / Month / Ticker) while the rest
        of a wide table scrolls — needs a solid background to cover content
        sliding beneath it */
-    .x-scroll table th:first-child,
-    .x-scroll table td:first-child {
+    /* tfoot excluded: footer rows lead with wide colSpan cells ("Year N
+       Totals") that would pin over and hide the scrolling total columns */
+    .x-scroll table thead th:first-child,
+    .x-scroll table tbody td:first-child {
       position: sticky; left: 0; z-index: 1;
       background: var(--bg);
     }

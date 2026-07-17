@@ -31,11 +31,11 @@ export default function FixedDepositsTab() {
   const totals = useMemo(() => {
     let principal = 0, interest = 0, maturity = 0;
     deposits.forEach(fd => {
+      const p = parseFloat(fd.principal) || 0;
+      principal += p; // count every deposit — a 0%-rate FD is still principal
       const c = calcFd(fd);
-      if (!c) return;
-      principal += parseFloat(fd.principal) || 0;
-      interest += c.interest;
-      maturity += c.maturityValue;
+      interest += c ? c.interest : 0;
+      maturity += c ? c.maturityValue : p;
     });
     return { principal, interest, maturity };
   }, [deposits]);
@@ -77,7 +77,7 @@ export default function FixedDepositsTab() {
           {[
             { label: "Total Principal", value: totals.principal, color: FD_COLOR },
             { label: "Total Interest", value: totals.interest, color: INT_COLOR },
-            { label: "Total at Maturity", value: totals.maturity, color: "#fff" },
+            { label: "Total at Maturity", value: totals.maturity, color: "var(--text)" },
             { label: "Avg Rate", value: null, extra: deposits.length > 0 ? (deposits.reduce((s, fd) => s + (parseFloat(fd.rate) || 0), 0) / deposits.length).toFixed(2) + "% p.a." : "—", color: SEM.sa },
           ].map(({ label, value, extra, color }) => (
             <div key={label} style={{ ...cardStyle, textAlign: "center" }}>
@@ -145,7 +145,7 @@ export default function FixedDepositsTab() {
             <div style={{ fontSize: 11, color: FD_COLOR, fontWeight: 600, marginBottom: 10 }}>Preview</div>
             <div style={{ display: "flex", gap: 24, flexWrap: "wrap" }}>
               <div><div style={{ fontSize: 10, color: "var(--muted)" }}>Interest Earned</div><div style={{ fontSize: 16, fontWeight: 700, color: INT_COLOR }}>{fmtRM(c.interest)}</div></div>
-              <div><div style={{ fontSize: 10, color: "var(--muted)" }}>Maturity Value</div><div style={{ fontSize: 16, fontWeight: 700, color: "#fff" }}>{fmtRM(c.maturityValue)}</div></div>
+              <div><div style={{ fontSize: 10, color: "var(--muted)" }}>Maturity Value</div><div style={{ fontSize: 16, fontWeight: 700, color: "var(--text)" }}>{fmtRM(c.maturityValue)}</div></div>
               {c.maturityDate && <div><div style={{ fontSize: 10, color: "var(--muted)" }}>Matures</div><div style={{ fontSize: 16, fontWeight: 700, color: FD_COLOR }}>{c.maturityDate}</div></div>}
             </div>
           </div>
@@ -183,7 +183,7 @@ export default function FixedDepositsTab() {
                           </div>
                           <div>
                             <div style={{ fontSize: 10, color: "var(--muted)" }}>Maturity Value</div>
-                            <div style={{ fontSize: 13, fontWeight: 600, color: "#fff" }}>{fmtRM(c.maturityValue)}</div>
+                            <div style={{ fontSize: 13, fontWeight: 600, color: "var(--text)" }}>{fmtRM(c.maturityValue)}</div>
                           </div>
                           {c.maturityDate && (
                             <div>

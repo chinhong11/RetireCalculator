@@ -41,7 +41,7 @@ export function MonthlyBreakdown({ monthly, prYear, age }) {
         <span>
           {prYear === 1 && <>As a <strong style={{ color: "var(--accent)" }}>1st-year PR</strong>, your combined CPF rate is <strong style={{ color: "var(--accent)" }}>9%</strong> — much lower than the full 37%. Rates rise to 24% in Year 2 and reach full citizen rates from Year 3 onwards.</>}
           {prYear === 2 && <>As a <strong style={{ color: "var(--accent)" }}>2nd-year PR</strong>, your combined CPF rate is <strong style={{ color: "var(--accent)" }}>24%</strong>. From next year, you'll contribute at the full citizen rate of 37%.</>}
-          {prYear >= 3 && <>You're contributing at the <strong style={{ color: "var(--accent)" }}>full citizen rate of 37%</strong> (employee 20% + employer 17%).</>}
+          {prYear >= 3 && <>You're contributing at the <strong style={{ color: "var(--accent)" }}>{age <= 55 ? "full citizen rate" : "senior-band citizen rate"} of {(monthly.rates.total * 100).toFixed(0)}%</strong> (employee {(monthly.rates.employee * 100).toFixed(0)}% + employer {(monthly.rates.employer * 100).toFixed(0)}%).{age > 55 ? " CPF rates step down after 55." : ""}</>}
         </span>
       </div>
     </div>

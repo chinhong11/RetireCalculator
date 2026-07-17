@@ -91,15 +91,15 @@ export default function EPFTab() {
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: 14 }}>
           <div>
             <div style={{ fontSize: 11, color: EPF_PER, marginBottom: 4 }}>Akaun Persaraan (RM)</div>
-            <MoneyInput value={startPer} max={1e8} onChange={setStartPer} style={inputStyle} />
+            <MoneyInput value={startPer} max={1e8} placeholder="0" onChange={setStartPer} style={inputStyle} />
           </div>
           <div>
             <div style={{ fontSize: 11, color: EPF_SEJ, marginBottom: 4 }}>Akaun Sejahtera (RM)</div>
-            <MoneyInput value={startSej} max={1e8} onChange={setStartSej} style={inputStyle} />
+            <MoneyInput value={startSej} max={1e8} placeholder="0" onChange={setStartSej} style={inputStyle} />
           </div>
           <div>
             <div style={{ fontSize: 11, color: EPF_FLK, marginBottom: 4 }}>Akaun Fleksibel (RM)</div>
-            <MoneyInput value={startFlek} max={1e8} onChange={setStartFlek} style={inputStyle} />
+            <MoneyInput value={startFlek} max={1e8} placeholder="0" onChange={setStartFlek} style={inputStyle} />
           </div>
         </div>
       </div>
@@ -111,7 +111,7 @@ export default function EPFTab() {
           {[
             { label: "Employee (11%)", value: monthly.employeeContrib, color: "var(--accent)" },
             { label: `Employer (${age < 60 ? (wage > 5000 ? "12%" : "13%") : "6%"})`, value: monthly.employerContrib, color: "var(--accent2)" },
-            { label: "Total Monthly", value: monthly.total, color: "#fff" },
+            { label: "Total Monthly", value: monthly.total, color: "var(--text)" },
             { label: "Take-Home Pay", value: monthly.takeHome, color: EPF_PER },
           ].map(({ label, value, color }) => (
             <div key={label} style={{ background: "var(--hover-bg)", borderRadius: 10, padding: "10px 14px" }}>
@@ -155,7 +155,7 @@ export default function EPFTab() {
           { label: `Akaun Persaraan (Yr ${years})`, value: finalRow.per, color: EPF_PER },
           { label: `Akaun Sejahtera (Yr ${years})`, value: finalRow.sej, color: EPF_SEJ },
           { label: `Akaun Fleksibel (Yr ${years})`, value: finalRow.flek, color: EPF_FLK },
-          { label: `Total EPF (Yr ${years})`, value: finalRow.total, color: "#fff" },
+          { label: `Total EPF (Yr ${years})`, value: finalRow.total, color: "var(--text)" },
         ].map(({ label, value, color }) => (
           <div key={label} style={{ ...cardStyle, textAlign: "center" }}>
             <div style={{ fontSize: 10, color: "var(--muted)", marginBottom: 6 }}>{label}</div>

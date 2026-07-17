@@ -96,7 +96,10 @@ export default function CryptoTab() {
   const priced = enriched.filter(h => h.value !== null);
   const totalValue = priced.reduce((s, h) => s + h.value, 0);
   const totalPnl = priced.reduce((s, h) => s + h.pnl, 0);
-  const totalPnlPct = totalCost > 0 && priced.length ? (totalPnl / totalCost) * 100 : null;
+  const pricedCost = priced.reduce((s, h) => s + h.cost, 0);
+  // % is measured against the cost of PRICED positions only — including
+  // unpriced cost in the denominator understated the true return
+  const totalPnlPct = pricedCost > 0 ? (totalPnl / pricedCost) * 100 : null;
   const anyFetching = fetching.size > 0;
 
   // Aggregate all lots for the selected DCA ticker
