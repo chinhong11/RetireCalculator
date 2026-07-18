@@ -329,7 +329,10 @@ export default function SavingsTab({ projectionData, yearsToProject, cpfMonthly,
                   );
                 }
 
-                const monthsNeeded = Math.ceil(targetSGD / monthlySavings);
+                // Existing cash counts toward the goal (the projection chart
+                // above already does) — flat savings, no return compounding
+                const remaining    = Math.max(0, targetSGD - startCash);
+                const monthsNeeded = Math.ceil(remaining / monthlySavings);
                 const yearsNeeded  = monthsNeeded / 12;
                 const currentAge   = projectionData[0]?.age ?? 30;
                 const reachAge     = currentAge + yearsNeeded;

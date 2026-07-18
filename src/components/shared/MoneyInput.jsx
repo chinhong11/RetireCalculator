@@ -23,7 +23,8 @@ import { useRef } from "react";
 export function MoneyInput({ value, onChange, max = 1e12, placeholder, className, style, autoFocus, onKeyDown }) {
   const ref = useRef(null);
 
-  const display = value ? Math.trunc(value).toLocaleString("en-US") : "";
+  const intValue = Math.trunc(value || 0);
+  const display = intValue ? intValue.toLocaleString("en-US") : "";
 
   const handleChange = (e) => {
     const el = e.target;
@@ -33,12 +34,17 @@ export function MoneyInput({ value, onChange, max = 1e12, placeholder, className
     const num = Math.min(digits ? parseInt(digits, 10) : 0, max);
     onChange(num);
 
-    // Restore the caret after React re-renders the formatted value: place it
-    // after the same number of digits it had to its left before the edit.
+    // After the edit, force the DOM back to the canonical format and restore
+    // the caret (same digit count to its left). Setting el.value directly is
+    // required: when the parsed number EQUALS the parent's current state
+    // (typing past max, typing letters into an empty field), a scalar
+    // useState setter bails out of re-rendering and the raw typed text would
+    // otherwise stay on screen.
     const restore = () => {
       const input = ref.current;
       if (!input) return;
       const formatted = num ? num.toLocaleString("en-US") : "";
+      if (input.value !== formatted) input.value = formatted;
       let pos = 0, seen = 0;
       while (pos < formatted.length && seen < digitsBeforeCaret) {
         if (/\d/.test(formatted[pos])) seen++;

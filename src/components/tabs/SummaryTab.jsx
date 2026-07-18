@@ -435,7 +435,7 @@ export default function SummaryTab({ cpfData, yearsToProject, projectionData }) 
         <span style={{ fontSize: 13, flexShrink: 0, opacity: 0.5 }}>📌</span>
         <span>
           <strong style={{ color: "var(--label)", fontWeight: 700 }}>Note:</strong>{" "}
-          CPF figures are projected values based on your inputs — not actual current balances. Property equity reflects total downpayments recorded, not appraised market value. Stock and crypto values show cost basis only. No currency conversion is applied between SGD, MYR, and USD. Visit each tab to see live portfolio values and unrealised P&amp;L.
+          CPF figures are projected values based on your inputs — not actual current balances. Property equity reflects total downpayments recorded, not appraised market value. Stock and crypto values show cost basis only. The net-worth hero converts at the FX rates shown; the currency sections below display native amounts unconverted. Visit each tab to see live portfolio values and unrealised P&amp;L.
         </span>
       </div>
     </div>

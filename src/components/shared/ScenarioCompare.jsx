@@ -19,6 +19,17 @@ export function ScenarioCompare({ baseInputs, gridLineColor }) {
   const [salaryB, setSalaryB]       = useState(baseInputs.salary);
   const [incrementB, setIncrementB] = useState(baseInputs.annualIncrement);
 
+  // The sidebar stays editable while this panel is open. When the base
+  // changes, untouched Scenario B fields follow it (otherwise B silently
+  // becomes "what if I earned my OLD salary" and the reset button appears
+  // without the user ever touching B); customized fields are kept.
+  const [prevBase, setPrevBase] = useState(baseInputs);
+  if (prevBase !== baseInputs) {
+    if (salaryB === prevBase.salary) setSalaryB(baseInputs.salary);
+    if (incrementB === prevBase.annualIncrement) setIncrementB(baseInputs.annualIncrement);
+    setPrevBase(baseInputs);
+  }
+
   const projA = useMemo(() => projectYears(baseInputs), [baseInputs]);
   const projB = useMemo(
     () => projectYears({ ...baseInputs, salary: salaryB, annualIncrement: incrementB }),

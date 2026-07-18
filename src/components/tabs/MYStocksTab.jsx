@@ -87,7 +87,10 @@ export default function MYStocksTab() {
   const priced = enriched.filter(h => h.value !== null);
   const totalValue = priced.reduce((s, h) => s + h.value, 0);
   const totalPnl = priced.reduce((s, h) => s + h.pnl, 0);
-  const totalPnlPct = totalCost > 0 && priced.length ? (totalPnl / totalCost) * 100 : null;
+  const pricedCost = priced.reduce((s, h) => s + h.cost, 0);
+  // % is measured against the cost of PRICED positions only — including
+  // unpriced cost in the denominator understated the true return
+  const totalPnlPct = pricedCost > 0 ? (totalPnl / pricedCost) * 100 : null;
   const anyFetching = fetching.size > 0;
 
   const exportMyStocksCsv = () => {
@@ -258,7 +261,7 @@ export default function MYStocksTab() {
                             </div>
                             {h.pd.manual ? (
                               <div style={{ fontSize: 10, color: "var(--muted)", fontStyle: "italic" }}>manual</div>
-                            ) : h.pd.prevClose != null && (() => {
+                            ) : h.pd.prevClose > 0 && (() => {
                               const chg = ((h.pd.price - h.pd.prevClose) / h.pd.prevClose) * 100;
                               return <div style={{ fontSize: 11, color: chg >= 0 ? SEM.oa : SEM.danger }}>{chg >= 0 ? "▲" : "▼"} {Math.abs(chg).toFixed(2)}% today</div>;
                             })()}
